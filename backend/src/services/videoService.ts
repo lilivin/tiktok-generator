@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs/promises';
-import { VideoJob, VideoGenerationRequest, VideoAssets } from '../types';
+import { VideoJob, VideoGenerationRequest, VideoAssets, SceneTiming } from '../types';
 import { FalAIService } from './falaiService';
 import { ElevenLabsService } from './elevenlabsService';
 import { RemotionService } from './remotionService';
@@ -15,6 +15,7 @@ export class VideoService {
   private falaiService: FalAIService;
   private elevenlabsService: ElevenLabsService;
   private remotionService: RemotionService;
+  private serverPort: number;
 
   constructor() {
     this.outputDir = path.join(process.cwd(), 'generated-videos');
@@ -24,6 +25,7 @@ export class VideoService {
     this.falaiService = new FalAIService();
     this.elevenlabsService = new ElevenLabsService();
     this.remotionService = new RemotionService();
+    this.serverPort = parseInt(process.env.PORT || '3000');
   }
 
   static getInstance(): VideoService {
@@ -39,6 +41,35 @@ export class VideoService {
     } catch {
       await fs.mkdir(this.outputDir, { recursive: true });
     }
+  }
+
+  /**
+   * Calculate dynamic timing based on audio durations
+   */
+  private calculateSceneTiming(audioFiles: VideoAssets['audioFiles']): SceneTiming {
+    const TIMER_DURATION = 3; // Fixed 3 seconds for countdown
+
+    const timing = {
+      intro: audioFiles.intro?.duration || 3,
+      questions: audioFiles.questions.map(q => q.duration),
+      timer: TIMER_DURATION,
+      answers: audioFiles.answers.map(a => a.duration),
+      outro: audioFiles.outro?.duration || 4
+    };
+
+    // Log exact durations for debugging
+    console.log('🎵 Exact audio durations (seconds):');
+    console.log(`  Intro: ${timing.intro}s`);
+    timing.questions.forEach((duration, i) => {
+      console.log(`  Question ${i + 1}: ${duration}s`);
+    });
+    console.log(`  Timer (fixed): ${timing.timer}s`);
+    timing.answers.forEach((duration, i) => {
+      console.log(`  Answer ${i + 1}: ${duration}s`);
+    });
+    console.log(`  Outro: ${timing.outro}s`);
+
+    return timing;
   }
 
   async createVideoJob(request: VideoGenerationRequest): Promise<string> {
@@ -163,11 +194,26 @@ export class VideoService {
         throw new Error('Assets not generated for job');
       }
 
+      // Calculate dynamic timing based on actual audio durations
+      const timing = this.calculateSceneTiming(job.assets.audioFiles);
+
+      console.log('Dynamic timing calculated:', {
+        intro: timing.intro,
+        questionsAvg: timing.questions.reduce((a, b) => a + b, 0) / timing.questions.length,
+        timer: timing.timer,
+        answersAvg: timing.answers.reduce((a, b) => a + b, 0) / timing.answers.length,
+        outro: timing.outro
+      });
+
+      // Convert local file paths to HTTP URLs for Remotion
+      const httpAssets = this.convertAssetsToHttpUrls(job.assets, job.id);
+
       await this.remotionService.prepareComposition({
         topic: job.topic,
         questions: job.questions,
-        backgroundImages: job.assets.backgroundImages,
-        audioFiles: job.assets.audioFiles,
+        backgroundImages: httpAssets.backgroundImages,
+        audioFiles: httpAssets.audioFiles,
+        timing
       });
 
     } catch (error) {
@@ -184,11 +230,18 @@ export class VideoService {
 
       const outputPath = path.join(outputDir, `quiz-${job.id}.mp4`);
       
+      // Calculate dynamic timing for rendering
+      const timing = this.calculateSceneTiming(job.assets.audioFiles);
+      
+      // Convert local file paths to HTTP URLs for Remotion
+      const httpAssets = this.convertAssetsToHttpUrls(job.assets, job.id);
+      
       await this.remotionService.renderVideo({
         topic: job.topic,
         questions: job.questions,
-        backgroundImages: job.assets.backgroundImages,
-        audioFiles: job.assets.audioFiles,
+        backgroundImages: httpAssets.backgroundImages,
+        audioFiles: httpAssets.audioFiles,
+        timing
       }, outputPath, (progress: number) => {
         // Update progress during rendering
         const renderProgress = 80 + (progress * 0.2); // 80-100%
@@ -245,5 +298,40 @@ export class VideoService {
         console.log(`Cleaned up old job ${jobId}`);
       }
     }
+  }
+
+  /**
+   * Convert local file path to HTTP URL for Remotion
+   */
+  private convertToHttpUrl(filePath: string, jobId: string): string {
+    const filename = path.basename(filePath);
+    return `http://localhost:${this.serverPort}/assets/${jobId}/${filename}`;
+  }
+
+  /**
+   * Convert all asset paths to HTTP URLs
+   */
+  private convertAssetsToHttpUrls(assets: VideoAssets, jobId: string): VideoAssets {
+    return {
+      backgroundImages: assets.backgroundImages.map(path => this.convertToHttpUrl(path, jobId)),
+      audioFiles: {
+        intro: assets.audioFiles.intro ? {
+          ...assets.audioFiles.intro,
+          path: this.convertToHttpUrl(assets.audioFiles.intro.path, jobId)
+        } : undefined,
+        questions: assets.audioFiles.questions.map(audio => ({
+          ...audio,
+          path: this.convertToHttpUrl(audio.path, jobId)
+        })),
+        answers: assets.audioFiles.answers.map(audio => ({
+          ...audio,
+          path: this.convertToHttpUrl(audio.path, jobId)
+        })),
+        outro: assets.audioFiles.outro ? {
+          ...assets.audioFiles.outro,
+          path: this.convertToHttpUrl(assets.audioFiles.outro.path, jobId)
+        } : undefined,
+      }
+    };
   }
 } 

@@ -33,6 +33,53 @@ fastify.get('/health', async (request, reply) => {
   };
 });
 
+// Serve assets for Remotion rendering
+fastify.get<{
+  Params: { jobId: string; filename: string };
+}>('/assets/:jobId/:filename', async (request, reply) => {
+  try {
+    const { jobId, filename } = request.params;
+    
+    // Construct file path
+    const filePath = path.join(process.cwd(), 'generated-videos', `job-${jobId}`, filename);
+    
+    // Check if file exists and is within the generated-videos directory (security)
+    const normalizedFilePath = path.normalize(filePath);
+    const baseDir = path.join(process.cwd(), 'generated-videos');
+    
+    if (!normalizedFilePath.startsWith(baseDir)) {
+      reply.status(403);
+      return { error: 'Access denied' };
+    }
+
+    try {
+      await fs.access(normalizedFilePath);
+    } catch {
+      reply.status(404);
+      return { error: 'File not found' };
+    }
+
+    // Set appropriate headers based on file extension
+    const ext = path.extname(filename).toLowerCase();
+    if (ext === '.mp3') {
+      reply.header('Content-Type', 'audio/mpeg');
+    } else if (ext === '.jpg' || ext === '.jpeg') {
+      reply.header('Content-Type', 'image/jpeg');
+    } else if (ext === '.png') {
+      reply.header('Content-Type', 'image/png');
+    }
+
+    // Stream the file
+    const stream = await fs.open(normalizedFilePath, 'r');
+    return reply.send(stream.createReadStream());
+
+  } catch (error) {
+    fastify.log.error('Error serving asset:', error);
+    reply.status(500);
+    return { error: 'Internal server error' };
+  }
+});
+
 // Generate video endpoint
 fastify.post<{
   Body: unknown;

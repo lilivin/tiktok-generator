@@ -30,14 +30,20 @@ export interface VideoGenerationStatus {
   error?: string;
 }
 
+// Audio file with duration information
+export interface AudioWithDuration {
+  path: string;
+  duration: number; // Duration in seconds
+}
+
 // Backend-specific types
 export interface VideoAssets {
   backgroundImages: string[]; // Paths to generated background images
   audioFiles: {
-    intro?: string;
-    questions: string[]; // Audio for each question
-    answers: string[]; // Audio for each answer  
-    outro?: string;
+    intro?: AudioWithDuration;
+    questions: AudioWithDuration[]; // Audio for each question with duration
+    answers: AudioWithDuration[]; // Audio for each answer with duration
+    outro?: AudioWithDuration;
   };
 }
 
@@ -69,15 +75,25 @@ export interface ElevenLabsVoiceResponse {
   audio_base64?: string;
 }
 
+// Scene timing configuration
+export interface SceneTiming {
+  intro: number; // Duration in seconds
+  questions: number[]; // Duration for each question
+  timer: number; // Fixed timer duration
+  answers: number[]; // Duration for each answer
+  outro: number; // Duration in seconds
+}
+
 // Remotion props
 export interface VideoCompositionProps {
   topic: string;
   questions: Question[];
   backgroundImages: string[];
   audioFiles: {
-    intro?: string;
-    questions: string[];
-    answers: string[];
-    outro?: string;
+    intro?: AudioWithDuration;
+    questions: AudioWithDuration[];
+    answers: AudioWithDuration[];
+    outro?: AudioWithDuration;
   };
+  timing: SceneTiming; // Dynamic timing based on audio durations
 } 

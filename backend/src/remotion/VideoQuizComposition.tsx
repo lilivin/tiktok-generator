@@ -18,113 +18,137 @@ import { TimerScene } from './scenes/TimerScene';
 import { AnswerScene } from './scenes/AnswerScene';
 import { OutroScene } from './scenes/OutroScene';
 
-// Duration configuration (in frames at 30fps)
-const INTRO_DURATION = 90; // 3 seconds
-const QUESTION_DURATION = 120; // 4 seconds  
-const TIMER_DURATION = 90; // 3 seconds
-const ANSWER_DURATION = 90; // 3 seconds
-const OUTRO_DURATION = 120; // 4 seconds
-
 export const VideoQuizComposition: React.FC<VideoCompositionProps> = ({
   topic,
   questions,
   backgroundImages,
   audioFiles,
+  timing,
 }) => {
   const { fps } = useVideoConfig();
   
-  // Calculate total duration based on number of questions
-  const totalDuration = INTRO_DURATION + 
-    (questions.length * (QUESTION_DURATION + TIMER_DURATION + ANSWER_DURATION)) + 
-    OUTRO_DURATION;
+  // Convert timing from seconds to frames
+  const introDurationFrames = Math.round(timing.intro * fps);
+  const questionDurationFrames = timing.questions.map(d => Math.round(d * fps));
+  const timerDurationFrames = Math.round(timing.timer * fps);
+  const answerDurationFrames = timing.answers.map(d => Math.round(d * fps));
+  const outroDurationFrames = Math.round(timing.outro * fps);
+  
+  // Calculate total duration
+  const totalDuration = introDurationFrames + 
+    questions.reduce((total, _, index) => 
+      total + questionDurationFrames[index] + timerDurationFrames + answerDurationFrames[index], 0
+    ) + outroDurationFrames;
+
+  console.log('🎬 Video timing conversion (seconds → frames @ 30fps):');
+  console.log(`  Intro: ${timing.intro}s → ${introDurationFrames} frames`);
+  timing.questions.forEach((seconds, i) => {
+    console.log(`  Question ${i + 1}: ${seconds}s → ${questionDurationFrames[i]} frames`);
+  });
+  console.log(`  Timer: ${timing.timer}s → ${timerDurationFrames} frames`);
+  timing.answers.forEach((seconds, i) => {
+    console.log(`  Answer ${i + 1}: ${seconds}s → ${answerDurationFrames[i]} frames`);
+  });
+  console.log(`  Outro: ${timing.outro}s → ${outroDurationFrames} frames`);
+  console.log(`  Total: ${totalDuration} frames (${(totalDuration / fps).toFixed(2)}s)`);
 
   let currentFrame = 0;
 
   return (
     <AbsoluteFill>
-      {/* Background Music */}
+      {/* Background Music - commented out as file doesn't exist
       <Audio
         src={staticFile('background-music.mp3')}
         volume={0.3}
         loop
       />
+      */}
 
       {/* Intro Scene */}
-      <Sequence from={currentFrame} durationInFrames={INTRO_DURATION}>
+      <Sequence from={currentFrame} durationInFrames={introDurationFrames}>
         <IntroScene
           topic={topic}
           backgroundImage={backgroundImages[0] || ''}
-          audioFile={audioFiles.intro}
+          audioFile={audioFiles.intro?.path}
         />
       </Sequence>
-      {currentFrame += INTRO_DURATION}
+      {currentFrame += introDurationFrames}
 
-      {/* Question Sequences */}
+      {/* Question Sequences - now with dynamic timing */}
       {questions.map((question, index) => {
         const questionStart = currentFrame;
-        const timerStart = questionStart + QUESTION_DURATION;
-        const answerStart = timerStart + TIMER_DURATION;
+        const questionDuration = questionDurationFrames[index];
+        const timerStart = questionStart + questionDuration;
+        const answerStart = timerStart + timerDurationFrames;
+        const answerDuration = answerDurationFrames[index];
         
         // Update currentFrame for next iteration
-        const sequenceEnd = answerStart + ANSWER_DURATION;
+        currentFrame += questionDuration + timerDurationFrames + answerDuration;
         
         return (
           <React.Fragment key={`question-${index}`}>
-            {/* Question Scene */}
-            <Sequence from={questionStart} durationInFrames={QUESTION_DURATION}>
+            {/* Question Scene - dynamic duration based on audio */}
+            <Sequence from={questionStart} durationInFrames={questionDuration}>
               <QuestionScene
                 question={question.question}
                 backgroundImage={backgroundImages[index + 1]}
-                audioFile={audioFiles.questions[index]}
+                audioFile={audioFiles.questions[index]?.path}
                 questionNumber={index + 1}
               />
             </Sequence>
 
-            {/* Timer Scene */}
-            <Sequence from={timerStart} durationInFrames={TIMER_DURATION}>
+            {/* Timer Scene - fixed 3 seconds */}
+            <Sequence from={timerStart} durationInFrames={timerDurationFrames}>
               <TimerScene
                 backgroundImage={backgroundImages[index + 1]}
-                duration={TIMER_DURATION}
+                duration={timerDurationFrames}
               />
             </Sequence>
 
-            {/* Answer Scene */}
-            <Sequence from={answerStart} durationInFrames={ANSWER_DURATION}>
+            {/* Answer Scene - dynamic duration based on audio */}
+            <Sequence from={answerStart} durationInFrames={answerDuration}>
               <AnswerScene
                 answer={question.answer}
                 backgroundImage={backgroundImages[index + 1]}
-                audioFile={audioFiles.answers[index]}
+                audioFile={audioFiles.answers[index]?.path}
               />
             </Sequence>
           </React.Fragment>
         );
       })}
 
-      {/* Update currentFrame after all questions */}
-      {(() => {
-        currentFrame += questions.length * (QUESTION_DURATION + TIMER_DURATION + ANSWER_DURATION);
-        return null;
-      })()}
-
       {/* Outro Scene */}
-      <Sequence from={currentFrame} durationInFrames={OUTRO_DURATION}>
+      <Sequence from={currentFrame} durationInFrames={outroDurationFrames}>
         <OutroScene
           backgroundImage={backgroundImages[0]} // Reuse intro background
-          audioFile={audioFiles.outro}
+          audioFile={audioFiles.outro?.path}
         />
       </Sequence>
     </AbsoluteFill>
   );
 };
 
-// Composition definition for Remotion
+// Composition definition for Remotion with dynamic duration calculation
 export const VideoQuizCompositionConfig = {
   id: 'VideoQuiz',
   component: VideoQuizComposition,
-  durationInFrames: (questionCount: number) => 
-    INTRO_DURATION + 
-    (questionCount * (QUESTION_DURATION + TIMER_DURATION + ANSWER_DURATION)) + 
-    OUTRO_DURATION,
+  durationInFrames: (timing: any, questionCount: number, fps: number = 30) => {
+    if (!timing) {
+      // Fallback to default durations if timing not provided
+      return 90 + (questionCount * (120 + 90 + 90)) + 120; // Old hardcoded values
+    }
+    
+    const introDuration = Math.round(timing.intro * fps);
+    const outroDuration = Math.round(timing.outro * fps);
+    const timerDuration = Math.round(timing.timer * fps);
+    
+    const questionsDuration = timing.questions.reduce((total: number, duration: number) => 
+      total + Math.round(duration * fps), 0);
+    const answersDuration = timing.answers.reduce((total: number, duration: number) => 
+      total + Math.round(duration * fps), 0);
+    
+    return introDuration + questionsDuration + (questionCount * timerDuration) + answersDuration + outroDuration;
+  },
   fps: 30,
   width: 1080,
   height: 1920,

@@ -1,7 +1,11 @@
 import axios, { AxiosResponse } from 'axios';
 import fs from 'fs/promises';
 import path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { ElevenLabsVoiceResponse, Question } from '../types';
+
+const execAsync = promisify(exec);
 
 export class ElevenLabsService {
   private apiKey: string;
@@ -16,34 +20,65 @@ export class ElevenLabsService {
   }
 
   /**
+   * Get actual duration of an audio file using ffprobe
+   */
+  private async getAudioDuration(filePath: string): Promise<number> {
+    try {
+      const { stdout } = await execAsync(
+        `ffprobe -v quiet -show_entries format=duration -of csv=p=0 "${filePath}"`
+      );
+      const duration = parseFloat(stdout.trim());
+      return duration; // Return exact duration without rounding
+    } catch (error) {
+      console.warn(`Could not get audio duration for ${filePath}, using estimate`);
+      // Fallback to text-based estimation
+      const filename = path.basename(filePath, '.mp3');
+      if (filename.includes('intro')) {
+        return this.calculateAudioDuration(`Nie zgadniesz, odpadasz`);
+      } else if (filename.includes('outro')) {
+        return this.calculateAudioDuration("I jak Ci poszło? Podziel się swoim wynikiem w komentarzu");
+      }
+      return 3; // Default fallback
+    }
+  }
+
+  /**
    * Generate audio for intro text
    */
-  async generateIntroAudio(topic: string, outputDir: string): Promise<string> {
+  async generateIntroAudio(topic: string, outputDir: string): Promise<{ path: string; duration: number }> {
     const text = `Nie zgadniesz, odpadasz - ${topic}`;
-    return this.generateAndSaveAudio(text, outputDir, 'intro');
+    const audioPath = await this.generateAndSaveAudio(text, outputDir, 'intro');
+    const duration = await this.getAudioDuration(audioPath);
+    return { path: audioPath, duration };
   }
 
   /**
    * Generate audio for outro text
    */
-  async generateOutroAudio(outputDir: string): Promise<string> {
+  async generateOutroAudio(outputDir: string): Promise<{ path: string; duration: number }> {
     const text = "I jak Ci poszło? Podziel się swoim wynikiem w komentarzu";
-    return this.generateAndSaveAudio(text, outputDir, 'outro');
+    const audioPath = await this.generateAndSaveAudio(text, outputDir, 'outro');
+    const duration = await this.getAudioDuration(audioPath);
+    return { path: audioPath, duration };
   }
 
   /**
    * Generate audio for a question
    */
-  async generateQuestionAudio(question: string, index: number, outputDir: string): Promise<string> {
-    return this.generateAndSaveAudio(question, outputDir, `question-${index + 1}`);
+  async generateQuestionAudio(question: string, index: number, outputDir: string): Promise<{ path: string; duration: number }> {
+    const audioPath = await this.generateAndSaveAudio(question, outputDir, `question-${index + 1}`);
+    const duration = await this.getAudioDuration(audioPath);
+    return { path: audioPath, duration };
   }
 
   /**
    * Generate audio for an answer
    */
-  async generateAnswerAudio(answer: string, index: number, outputDir: string): Promise<string> {
+  async generateAnswerAudio(answer: string, index: number, outputDir: string): Promise<{ path: string; duration: number }> {
     const text = `Odpowiedź to: ${answer}`;
-    return this.generateAndSaveAudio(text, outputDir, `answer-${index + 1}`);
+    const audioPath = await this.generateAndSaveAudio(text, outputDir, `answer-${index + 1}`);
+    const duration = await this.getAudioDuration(audioPath);
+    return { path: audioPath, duration };
   }
 
   /**
@@ -95,24 +130,24 @@ export class ElevenLabsService {
   }
 
   /**
-   * Generate all audio files for a video job
+   * Generate all audio files for a video job with durations
    */
   async generateAllAudio(topic: string, questions: Question[], outputDir: string): Promise<{
-    intro?: string;
-    questions: string[];
-    answers: string[];
-    outro?: string;
+    intro?: { path: string; duration: number };
+    questions: { path: string; duration: number }[];
+    answers: { path: string; duration: number }[];
+    outro?: { path: string; duration: number };
   }> {
     const audioFiles: string[] = [];
     
     try {
       // Generate intro audio
       const introAudio = await this.generateIntroAudio(topic, outputDir);
-      audioFiles.push(introAudio);
+      audioFiles.push(introAudio.path);
 
       // Generate question and answer audio
-      const questionAudios: string[] = [];
-      const answerAudios: string[] = [];
+      const questionAudios: { path: string; duration: number }[] = [];
+      const answerAudios: { path: string; duration: number }[] = [];
 
       for (let i = 0; i < questions.length; i++) {
         const question = questions[i];
@@ -122,16 +157,16 @@ export class ElevenLabsService {
 
         const questionAudio = await this.generateQuestionAudio(question.question, i, outputDir);
         questionAudios.push(questionAudio);
-        audioFiles.push(questionAudio);
+        audioFiles.push(questionAudio.path);
 
         const answerAudio = await this.generateAnswerAudio(question.answer, i, outputDir);
         answerAudios.push(answerAudio);
-        audioFiles.push(answerAudio);
+        audioFiles.push(answerAudio.path);
       }
 
       // Generate outro audio
       const outroAudio = await this.generateOutroAudio(outputDir);
-      audioFiles.push(outroAudio);
+      audioFiles.push(outroAudio.path);
 
       return {
         intro: introAudio,
@@ -155,13 +190,13 @@ export class ElevenLabsService {
   }
 
   /**
-   * Calculate estimated duration of audio text (rough estimate)
+   * Calculate estimated duration of audio text (exact estimate without rounding)
    */
   calculateAudioDuration(text: string): number {
     // Rough estimate: ~150 words per minute for Polish speech
     const wordsPerMinute = 150;
     const words = text.split(/\s+/).length;
     const minutes = words / wordsPerMinute;
-    return Math.max(1, Math.ceil(minutes * 60)); // At least 1 second
+    return minutes * 60; // Return exact calculated duration without rounding
   }
 } 
