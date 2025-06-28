@@ -19,7 +19,7 @@ export class FalAIService {
    * Generate background image for intro scene based on quiz topic
    */
   async generateIntroBackground(topic: string, outputDir: string): Promise<string> {
-    const prompt = this.createIntroPrompt(topic);
+    const prompt = this.generatePrompt(topic, `Introduction to a quiz about ${topic}`);
     return this.generateAndSaveImage(prompt, outputDir, 'intro-bg');
   }
 
@@ -27,43 +27,55 @@ export class FalAIService {
    * Generate background image for question scene
    */
   async generateQuestionBackground(question: string, index: number, outputDir: string): Promise<string> {
-    const prompt = this.createQuestionPrompt(question);
+    const topic = this.extractTopicFromQuestion(question);
+    const prompt = this.generatePrompt(topic, question);
     return this.generateAndSaveImage(prompt, outputDir, `question-${index + 1}-bg`);
   }
 
   /**
-   * Create optimized prompt for intro background
+   * Generate background image for outro scene
    */
-  private createIntroPrompt(topic: string): string {
-    return `Create a dynamic, colorful, modern social media background for a quiz about "${topic}". 
-    The image should be vibrant, engaging, and suitable for TikTok/Instagram. 
-    Use bold colors, gradients, and abstract elements that relate to the topic. 
-    The style should be contemporary, energetic, and attention-grabbing.
-    Vertical format 9:16 aspect ratio. High quality, professional look.
-    Avoid text, focus on visual elements only.`;
+  async generateOutroBackground(topic: string, outputDir: string): Promise<string> {
+    const prompt = this.generatePrompt(topic, `Conclusion of a quiz about ${topic}`);
+    return this.generateAndSaveImage(prompt, outputDir, 'outro-bg');
   }
 
   /**
-   * Create optimized prompt for question background
+   * Generate unified prompt for all background types
+   * Based on proven approach from previous project - optimized for realism
    */
-  private createQuestionPrompt(question: string): string {
-    // Extract key topic from question for better context
-    const keywords = this.extractKeywords(question);
+  private generatePrompt(topic: string, context: string): string {
+    console.log(`Generating realistic prompt for topic: ${topic}`);
     
-    return `Create a modern, dynamic background image related to "${keywords}". 
-    The background should be suitable for social media quiz content (TikTok/Instagram style).
-    Use vibrant colors, modern design elements, subtle patterns or gradients.
-    The image should complement the question without being distracting.
-    Vertical format 9:16 aspect ratio. High quality, contemporary look.
-    Avoid text, people, or specific objects - focus on abstract/thematic elements.`;
+    // Base prompt with topic and context - enhanced for realism
+    const basePrompt = `Create a high-quality, photorealistic illustration related to ${topic} that visually represents the concept or ideas behind the following context: "${context}". The image should be conceptually meaningful, visually engaging, and suitable for use in an educational or thought-provoking context.`;
+    
+    // Style specifications for realism
+    const stylePrompt = 'Use a realistic, photographic art style with natural lighting, detailed textures, and lifelike colors. Avoid cartoon, anime, or overly stylized elements. The image should look like a professional photograph or highly detailed digital artwork.';
+    
+    // Quality and technical specifications
+    const qualityPrompt = 'High resolution, sharp focus, professional photography quality, natural color grading, proper depth of field, realistic shadows and highlights.';
+    
+    // TikTok format requirements
+    const formatPrompt = 'vertical 9:16 aspect ratio, mobile-optimized, TikTok format';
+    
+    // Technical requirements
+    const technicalPrompt = 'no text overlays, no watermarks, clean composition, suitable for background use';
+    
+    const fullPrompt = `${basePrompt} ${stylePrompt} ${qualityPrompt} ${formatPrompt}, ${technicalPrompt}`;
+    
+    console.log(`Generated realistic prompt: "${fullPrompt.substring(0, 100)}..."`);
+    
+    return fullPrompt;
   }
 
   /**
-   * Extract keywords from question for better context
+   * Extract topic from question for better context
+   * Simplified version of keyword extraction
    */
-  private extractKeywords(question: string): string {
+  private extractTopicFromQuestion(question: string): string {
     // Simple keyword extraction - remove common words
-    const commonWords = ['co', 'jak', 'ile', 'gdzie', 'kiedy', 'który', 'która', 'które', 'czy', 'jakie', 'jaki', 'jaką'];
+    const commonWords = ['co', 'jak', 'ile', 'gdzie', 'kiedy', 'który', 'która', 'które', 'czy', 'jakie', 'jaki', 'jaką', 'the', 'what', 'how', 'where', 'when', 'which', 'why', 'who'];
     const words = question.toLowerCase().split(/\s+/);
     const keywords = words.filter(word => 
       word.length > 3 && 
@@ -71,7 +83,7 @@ export class FalAIService {
       !/^[0-9]+$/.test(word)
     );
     
-    return keywords.slice(0, 3).join(' ') || 'quiz question';
+    return keywords.slice(0, 3).join(' ') || 'general knowledge';
   }
 
   /**
@@ -88,8 +100,8 @@ export class FalAIService {
           image_size: "portrait_16_9", // 9:16 aspect ratio for social media (portrait format)
           num_images: 1,
           expand_prompt: true, // Use MagicPrompt for better results
-          rendering_speed: "BALANCED", // Balance between speed and quality
-          style: "DESIGN" // Optimized for design/graphics content
+          rendering_speed: "QUALITY", // Higher quality for better realism
+          style: "PHOTOGRAPHIC" // Optimized for photorealistic content
         },
         {
           headers: {
@@ -174,6 +186,10 @@ export class FalAIService {
         const questionBg = await this.generateQuestionBackground(question, i, outputDir);
         backgroundPaths.push(questionBg);
       }
+
+      // Generate outro background
+      const outroBg = await this.generateOutroBackground(topic, outputDir);
+      backgroundPaths.push(outroBg);
 
       return backgroundPaths;
 

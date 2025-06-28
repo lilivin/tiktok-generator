@@ -120,7 +120,7 @@ export const VideoQuizComposition: React.FC<VideoCompositionProps> = ({
       {/* Outro Scene */}
       <Sequence from={currentFrame} durationInFrames={outroDurationFrames}>
         <OutroScene
-          backgroundImage={backgroundImages[0]} // Reuse intro background
+          backgroundImage={backgroundImages[backgroundImages.length - 1]} // Use dedicated outro background
           audioFile={audioFiles.outro?.path}
         />
       </Sequence>
