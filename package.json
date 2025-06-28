@@ -15,10 +15,20 @@
     "start:frontend": "npm run start --prefix frontend",
     "start:backend": "npm run start --prefix backend"
   },
-  "keywords": ["video", "generator", "astro", "fastify", "remotion"],
+  "keywords": [
+    "video",
+    "generator",
+    "astro",
+    "fastify",
+    "remotion"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "canvas": "^3.1.2",
+    "ffmpeg-static": "^5.2.0"
   }
-} 
+}

@@ -27,5 +27,17 @@ export interface VideoGenerationStatus {
   step?: string;
   progress?: number;
   videoUrl?: string;
+  videoStreamUrl?: string; // URL for in-browser video playback
   error?: string;
+}
+
+// Additional types for enhanced functionality
+export interface VideoAssets {
+  backgroundImages: string[]; // Paths to generated background images
+  audioFiles: {
+    intro?: string;
+    questions: string[]; // Audio for each question
+    answers: string[]; // Audio for each answer  
+    outro?: string;
+  };
 } 

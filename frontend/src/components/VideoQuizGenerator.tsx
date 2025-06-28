@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus, Trash2, Loader2, Download, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Loader2, Download, AlertTriangle, CheckCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -113,6 +113,7 @@ export default function VideoQuizGenerator() {
           setGenerationStatus({
             status: 'completed',
             videoUrl: apiClient.getVideoDownloadUrl(id),
+            videoStreamUrl: apiClient.getVideoStreamUrl(id),
           });
         } else {
           // Still processing - continue polling
@@ -207,11 +208,11 @@ export default function VideoQuizGenerator() {
   if (generationStatus.status === 'completed') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-2xl">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
               <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
-                <Download className="h-6 w-6 text-green-600" />
+                <CheckCircle className="h-6 w-6 text-green-600" />
               </div>
             </div>
             <CardTitle className="text-green-700">Wideo jest gotowe!</CardTitle>
@@ -219,25 +220,74 @@ export default function VideoQuizGenerator() {
               Twój quiz wideo został pomyślnie wygenerowany
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <a 
-              href={generationStatus.videoUrl} 
-              download="quiz-video.mp4"
-              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-10 rounded-md px-8 w-full"
-            >
-              <Download className="h-4 w-4" />
-              Pobierz wideo (.MP4)
-            </a>
-            <Button 
-              variant="outline" 
-              className="w-full" 
-              onClick={resetForm}
-            >
-              Utwórz kolejny quiz
-            </Button>
+          <CardContent className="space-y-6">
+            {/* Video Player */}
+            {generationStatus.videoStreamUrl && (
+              <div className="space-y-3">
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold mb-2">Podgląd wideo</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Możesz obejrzeć wideo przed pobraniem
+                  </p>
+                </div>
+                <div className="relative rounded-lg overflow-hidden bg-black">
+                  <video
+                    controls
+                    className="w-full h-auto max-h-96 mx-auto"
+                    preload="metadata"
+                    style={{ aspectRatio: '9/16', maxWidth: '360px' }}
+                  >
+                    <source src={generationStatus.videoStreamUrl} type="video/mp4" />
+                    Twoja przeglądarka nie obsługuje odtwarzania wideo.
+                  </video>
+                </div>
+              </div>
+            )}
+            
+            {/* Download Actions */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <a 
+                href={generationStatus.videoUrl} 
+                download="quiz-video.mp4"
+                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-10 px-4"
+              >
+                <Download className="h-4 w-4" />
+                Pobierz wideo
+              </a>
+              <Button 
+                variant="outline" 
+                className="h-10" 
+                onClick={resetForm}
+              >
+                Utwórz kolejny quiz
+              </Button>
+            </div>
+            
+            {/* Share Actions */}
+            <div className="pt-4 border-t">
+              <p className="text-sm text-muted-foreground text-center mb-3">
+                Gotowe do publikacji na social media
+              </p>
+              <div className="flex justify-center space-x-4 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  1080x1920 (9:16)
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  30fps MP4
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                  TikTok/Instagram Ready
+                </div>
+              </div>
+            </div>
+
             <Alert>
               <AlertDescription>
-                Plik ma rozdzielczość 1080x1920 pikseli i jest gotowy do publikacji na TikToku i Instagram.
+                <strong>Porady:</strong> Plik jest zoptymalizowany pod TikTok i Instagram Stories. 
+                Pamiętaj o dodaniu hashtagów przy publikacji!
               </AlertDescription>
             </Alert>
           </CardContent>

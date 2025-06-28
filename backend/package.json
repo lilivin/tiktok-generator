@@ -8,22 +8,37 @@
     "start": "node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["fastify", "backend", "video-generator"],
+  "keywords": [
+    "fastify",
+    "backend",
+    "video-generator"
+  ],
   "author": "",
   "license": "ISC",
   "description": "Backend for video generator application",
   "dependencies": {
-    "fastify": "^5.1.0",
+    "@fal-ai/client": "^1.5.0",
     "@fastify/cors": "^10.0.1",
+    "@remotion/bundler": "^4.0.228",
+    "@remotion/renderer": "^4.0.228",
+    "axios": "^1.6.7",
     "dotenv": "^16.4.7",
-    "zod": "^3.25.67",
-    "uuid": "^11.0.3"
+    "fastify": "^5.1.0",
+    "ffmpeg-static": "^5.2.0",
+    "form-data": "^4.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "sharp": "^0.33.3",
+    "uuid": "^11.0.3",
+    "zod": "^3.25.67"
   },
   "devDependencies": {
-    "typescript": "^5.7.3",
     "@types/node": "^22.10.2",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
     "@types/uuid": "^10.0.0",
+    "nodemon": "^3.1.7",
     "tsx": "^4.19.2",
-    "nodemon": "^3.1.7"
+    "typescript": "^5.7.3"
   }
 }

@@ -1,7 +1,10 @@
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs/promises';
-import { VideoJob, VideoGenerationRequest } from '../types';
+import { VideoJob, VideoGenerationRequest, VideoAssets } from '../types';
+import { FalAIService } from './falaiService';
+import { ElevenLabsService } from './elevenlabsService';
+import { RemotionService } from './remotionService';
 
 // In-memory storage for video jobs (w produkcji byłaby to baza danych)
 const videoJobs = new Map<string, VideoJob>();
@@ -9,10 +12,18 @@ const videoJobs = new Map<string, VideoJob>();
 export class VideoService {
   private static instance: VideoService;
   private outputDir: string;
+  private falaiService: FalAIService;
+  private elevenlabsService: ElevenLabsService;
+  private remotionService: RemotionService;
 
   constructor() {
     this.outputDir = path.join(process.cwd(), 'generated-videos');
     this.ensureOutputDirectory();
+    
+    // Initialize external services
+    this.falaiService = new FalAIService();
+    this.elevenlabsService = new ElevenLabsService();
+    this.remotionService = new RemotionService();
   }
 
   static getInstance(): VideoService {
@@ -48,7 +59,8 @@ export class VideoService {
     // Start processing asynchronously
     this.processVideoJob(jobId).catch(error => {
       console.error(`Error processing video job ${jobId}:`, error);
-      this.updateJobStatus(jobId, 'failed', error.message);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.updateJobStatus(jobId, 'failed', errorMessage);
     });
 
     return jobId;
@@ -86,21 +98,31 @@ export class VideoService {
       // Update status to processing
       await this.updateJobStatus(jobId, 'processing', undefined, 10, 'Rozpoczynanie generowania...');
 
-      // Step 1: Generate background images (mock)
+      // Create job-specific directory
+      const jobDir = path.join(this.outputDir, `job-${jobId}`);
+      await fs.mkdir(jobDir, { recursive: true });
+
+      // Step 1: Generate background images with Fal.ai
       await this.updateJobStatus(jobId, 'processing', undefined, 20, 'Generowanie obrazów tła z AI...');
-      await this.mockGenerateBackgrounds(job);
+      const backgroundImages = await this.generateBackgrounds(job, jobDir);
 
-      // Step 2: Generate voice narration (mock)
+      // Step 2: Generate voice narration with ElevenLabs
       await this.updateJobStatus(jobId, 'processing', undefined, 40, 'Synteza głosu lektora...');
-      await this.mockGenerateVoice(job);
+      const audioFiles = await this.generateVoice(job, jobDir);
 
-      // Step 3: Compose video (mock)
+      // Store generated assets in job
+      job.assets = {
+        backgroundImages,
+        audioFiles,
+      };
+
+      // Step 3: Compose video with Remotion
       await this.updateJobStatus(jobId, 'processing', undefined, 60, 'Kompozycja elementów wideo...');
-      await this.mockComposeVideo(job);
+      await this.composeVideo(job);
 
-      // Step 4: Render final video (mock)
+      // Step 4: Render final video with Remotion
       await this.updateJobStatus(jobId, 'processing', undefined, 80, 'Renderowanie finalnego wideo...');
-      const outputPath = await this.mockRenderVideo(job);
+      const outputPath = await this.renderVideo(job, jobDir);
 
       // Step 5: Complete
       job.filePath = outputPath;
@@ -108,57 +130,78 @@ export class VideoService {
 
     } catch (error) {
       console.error(`Error in video processing pipeline for job ${jobId}:`, error);
-      await this.updateJobStatus(jobId, 'failed', error instanceof Error ? error.message : 'Unknown error');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      await this.updateJobStatus(jobId, 'failed', errorMessage);
+      
+      // Cleanup on failure
+      await this.cleanupJobAssets(jobId);
     }
   }
 
-  private async mockGenerateBackgrounds(job: VideoJob): Promise<void> {
-    // Mock delay for AI image generation
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // W rzeczywistej implementacji tutaj byłoby:
-    // - Wywołanie Fal.ai API dla każdego pytania + intro
-    // - Pobranie i zapisanie wygenerowanych obrazów
-    console.log(`Mock: Generated ${job.questions.length + 1} background images for job ${job.id}`);
+  private async generateBackgrounds(job: VideoJob, outputDir: string): Promise<string[]> {
+    try {
+      const questions = job.questions.map(q => q.question);
+      return await this.falaiService.generateAllBackgrounds(job.topic, questions, outputDir);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Błąd generowania obrazów tła: ${errorMessage}`);
+    }
   }
 
-  private async mockGenerateVoice(job: VideoJob): Promise<void> {
-    // Mock delay for TTS generation
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    // W rzeczywistej implementacji tutaj byłoby:
-    // - Wywołanie ElevenLabs API dla każdego pytania i odpowiedzi
-    // - Pobranie i zapisanie plików audio
-    console.log(`Mock: Generated voice for ${job.questions.length * 2} text segments for job ${job.id}`);
+  private async generateVoice(job: VideoJob, outputDir: string): Promise<VideoAssets['audioFiles']> {
+    try {
+      return await this.elevenlabsService.generateAllAudio(job.topic, job.questions, outputDir);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Błąd generowania głosu: ${errorMessage}`);
+    }
   }
 
-  private async mockComposeVideo(job: VideoJob): Promise<void> {
-    // Mock delay for video composition
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // W rzeczywistej implementacji tutaj byłoby:
-    // - Przygotowanie props dla Remotion
-    // - Inicjalizacja kompozycji z wszystkimi elementami
-    console.log(`Mock: Composed video elements for job ${job.id}`);
+  private async composeVideo(job: VideoJob): Promise<void> {
+    try {
+      if (!job.assets) {
+        throw new Error('Assets not generated for job');
+      }
+
+      await this.remotionService.prepareComposition({
+        topic: job.topic,
+        questions: job.questions,
+        backgroundImages: job.assets.backgroundImages,
+        audioFiles: job.assets.audioFiles,
+      });
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Błąd kompozycji wideo: ${errorMessage}`);
+    }
   }
 
-  private async mockRenderVideo(job: VideoJob): Promise<string> {
-    // Mock delay for video rendering
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    // Create a mock video file path
-    const filename = `quiz-${job.id}.mp4`;
-    const filePath = path.join(this.outputDir, filename);
-    
-    // W rzeczywistej implementacji tutaj byłoby:
-    // - Renderowanie wideo przez Remotion
-    // - Zapisanie pliku MP4 o specyfikacji 1080x1920, 30fps
-    
-    // For mock purposes, create an empty file
-    await fs.writeFile(filePath, 'mock video content');
-    
-    console.log(`Mock: Rendered video file for job ${job.id} at ${filePath}`);
-    return filePath;
+  private async renderVideo(job: VideoJob, outputDir: string): Promise<string> {
+    try {
+      if (!job.assets) {
+        throw new Error('Assets not generated for job');
+      }
+
+      const outputPath = path.join(outputDir, `quiz-${job.id}.mp4`);
+      
+      await this.remotionService.renderVideo({
+        topic: job.topic,
+        questions: job.questions,
+        backgroundImages: job.assets.backgroundImages,
+        audioFiles: job.assets.audioFiles,
+      }, outputPath, (progress: number) => {
+        // Update progress during rendering
+        const renderProgress = 80 + (progress * 0.2); // 80-100%
+        this.updateJobStatus(job.id, 'processing', undefined, renderProgress, 
+          `Renderowanie wideo: ${Math.round(progress * 100)}%`);
+      });
+
+      return outputPath;
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Błąd renderowania wideo: ${errorMessage}`);
+    }
   }
 
   async getVideoFilePath(jobId: string): Promise<string | null> {
@@ -173,8 +216,20 @@ export class VideoService {
         await fs.unlink(job.filePath);
         console.log(`Deleted video file for job ${jobId}`);
       } catch (error) {
-        console.error(`Error deleting video file for job ${jobId}:`, error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`Error deleting video file for job ${jobId}:`, errorMessage);
       }
+    }
+  }
+
+  private async cleanupJobAssets(jobId: string): Promise<void> {
+    try {
+      const jobDir = path.join(this.outputDir, `job-${jobId}`);
+      await fs.rm(jobDir, { recursive: true, force: true });
+      console.log(`Cleaned up assets for job ${jobId}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`Error cleaning up assets for job ${jobId}:`, errorMessage);
     }
   }
 
@@ -185,6 +240,7 @@ export class VideoService {
     for (const [jobId, job] of videoJobs.entries()) {
       if (job.createdAt < cutoffTime) {
         await this.deleteVideoFile(jobId);
+        await this.cleanupJobAssets(jobId);
         videoJobs.delete(jobId);
         console.log(`Cleaned up old job ${jobId}`);
       }

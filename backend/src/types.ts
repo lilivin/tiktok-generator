@@ -31,6 +31,16 @@ export interface VideoGenerationStatus {
 }
 
 // Backend-specific types
+export interface VideoAssets {
+  backgroundImages: string[]; // Paths to generated background images
+  audioFiles: {
+    intro?: string;
+    questions: string[]; // Audio for each question
+    answers: string[]; // Audio for each answer  
+    outro?: string;
+  };
+}
+
 export interface VideoJob {
   id: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
@@ -42,4 +52,32 @@ export interface VideoJob {
   error?: string;
   progress?: number;
   currentStep?: string;
+  assets?: VideoAssets; // Generated assets paths
+}
+
+// External API types
+export interface FalAIImageResponse {
+  images: Array<{
+    url: string;
+    width: number;
+    height: number;
+    content_type?: string;
+  }>;
+}
+
+export interface ElevenLabsVoiceResponse {
+  audio_base64?: string;
+}
+
+// Remotion props
+export interface VideoCompositionProps {
+  topic: string;
+  questions: Question[];
+  backgroundImages: string[];
+  audioFiles: {
+    intro?: string;
+    questions: string[];
+    answers: string[];
+    outro?: string;
+  };
 } 

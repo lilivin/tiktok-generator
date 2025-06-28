@@ -194,6 +194,76 @@ fastify.get<{
   }
 });
 
+// Stream video endpoint for in-browser playback
+fastify.get<{
+  Params: { videoId: string };
+}>('/api/stream-video/:videoId', async (request, reply) => {
+  try {
+    const { videoId } = request.params;
+
+    if (!videoId) {
+      reply.status(400);
+      return { error: 'Missing video ID' };
+    }
+
+    const job = await videoService.getVideoJob(videoId);
+
+    if (!job) {
+      reply.status(404);
+      return { error: 'Video job not found' };
+    }
+
+    if (job.status !== 'completed' || !job.filePath) {
+      reply.status(400);
+      return { error: 'Video is not ready for streaming' };
+    }
+
+    // Check if file exists
+    try {
+      await fs.access(job.filePath);
+    } catch {
+      reply.status(404);
+      return { error: 'Video file not found' };
+    }
+
+    // Get file stats for proper range handling
+    const stat = await fs.stat(job.filePath);
+    const fileSize = stat.size;
+    const range = request.headers.range;
+
+    if (range) {
+      // Handle range requests for video streaming
+      const parts = range.replace(/bytes=/, "").split("-");
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+      const chunksize = (end - start) + 1;
+
+      reply.status(206);
+      reply.header('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+      reply.header('Accept-Ranges', 'bytes');
+      reply.header('Content-Length', chunksize.toString());
+      reply.header('Content-Type', 'video/mp4');
+
+      const stream = await fs.open(job.filePath, 'r');
+      return reply.send(stream.createReadStream({ start, end }));
+    } else {
+      // No range request, send entire file
+      reply.header('Content-Length', fileSize.toString());
+      reply.header('Content-Type', 'video/mp4');
+      reply.header('Accept-Ranges', 'bytes');
+
+      const stream = await fs.open(job.filePath, 'r');
+      return reply.send(stream.createReadStream());
+    }
+
+  } catch (error) {
+    fastify.log.error('Error in stream-video endpoint:', error);
+    
+    reply.status(500);
+    return { error: 'Internal server error' };
+  }
+});
+
 // Root endpoint with API info
 fastify.get('/', async (request, reply) => {
   return {
@@ -203,7 +273,8 @@ fastify.get('/', async (request, reply) => {
       health: 'GET /health',
       generateVideo: 'POST /api/generate-video',
       videoStatus: 'GET /api/video-status/:videoId',
-      downloadVideo: 'GET /api/download-video/:videoId'
+      downloadVideo: 'GET /api/download-video/:videoId',
+      streamVideo: 'GET /api/stream-video/:videoId'
     },
     timestamp: new Date().toISOString()
   };

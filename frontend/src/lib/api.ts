@@ -52,5 +52,9 @@ export const apiClient = {
 
   getVideoDownloadUrl(videoId: string): string {
     return `${API_BASE_URL}/api/download-video/${videoId}`;
+  },
+
+  getVideoStreamUrl(videoId: string): string {
+    return `${API_BASE_URL}/api/stream-video/${videoId}`;
   }
 }; 

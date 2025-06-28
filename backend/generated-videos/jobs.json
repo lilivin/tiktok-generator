@@ -1,0 +1,40 @@
+[
+  {
+    "id": "df9ddb1a-e1ed-4f2f-ae44-cb30293af8f7",
+    "status": "processing",
+    "topic": "Wiedza o Polsce",
+    "questions": [
+      {
+        "question": "Jaka jest stolica Polski?",
+        "answer": "Warszawa"
+      },
+      {
+        "question": "Jaki jest najwyższy szczyt Polski?",
+        "answer": "Rysy"
+      }
+    ],
+    "createdAt": "2025-06-28T07:33:04.607Z",
+    "updatedAt": "2025-06-28T07:46:06.138Z",
+    "progress": 20,
+    "currentStep": "Generowanie obrazów tła z AI..."
+  },
+  {
+    "id": "45431be3-e832-471d-b893-f999f3c7d7ad",
+    "status": "processing",
+    "topic": "Test API",
+    "questions": [
+      {
+        "question": "Test pytanie 1?",
+        "answer": "Test odpowiedź 1"
+      },
+      {
+        "question": "Test pytanie 2?",
+        "answer": "Test odpowiedź 2"
+      }
+    ],
+    "createdAt": "2025-06-28T07:44:02.878Z",
+    "updatedAt": "2025-06-28T07:46:06.138Z",
+    "progress": 20,
+    "currentStep": "Generowanie obrazów tła z AI..."
+  }
+]
