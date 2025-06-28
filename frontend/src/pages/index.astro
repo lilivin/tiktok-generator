@@ -1,17 +1,18 @@
 ---
-import HelloWorld from '../components/HelloWorld';
+import VideoQuizGenerator from '../components/VideoQuizGenerator';
 import '../styles/global.css';
 ---
 
-<html lang="en">
+<html lang="pl">
 	<head>
 		<meta charset="utf-8" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<meta name="viewport" content="width=device-width" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<meta name="generator" content={Astro.generator} />
-		<title>Video Generator - Frontend</title>
+		<title>Generator Wideo-Quizów | Stwórz quiz dla TikTok i Instagram</title>
+		<meta name="description" content="Automatycznie generuj profesjonalne wideo-quizy dla social media. Szybko, łatwo i gotowe do publikacji na TikTok i Instagram." />
 	</head>
 	<body>
-		<HelloWorld client:load />
+		<VideoQuizGenerator client:load />
 	</body>
 </html>
