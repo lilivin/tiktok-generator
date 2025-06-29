@@ -101,7 +101,7 @@ export class FalAIService {
           num_images: 1,
           expand_prompt: true, // Use MagicPrompt for better results
           rendering_speed: "QUALITY", // Higher quality for better realism
-          style: "PHOTOGRAPHIC" // Optimized for photorealistic content
+          style: "REALISTIC" // Optimized for photorealistic content
         },
         {
           headers: {

@@ -50,7 +50,7 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id={VideoQuizCompositionConfig.id}
         component={VideoQuizComposition as any}
-        durationInFrames={VideoQuizCompositionConfig.durationInFrames(defaultTiming, 3)} // Default for 3 questions with timing
+        durationInFrames={VideoQuizCompositionConfig.durationInFrames(defaultTiming, 3)} // Default dla development/preview
         fps={VideoQuizCompositionConfig.fps}
         width={VideoQuizCompositionConfig.width}
         height={VideoQuizCompositionConfig.height}
@@ -58,7 +58,7 @@ export const RemotionRoot: React.FC = () => {
       />
     </>
   );
-}; 
+};
 
 // Register the root component with Remotion
 registerRoot(RemotionRoot); 

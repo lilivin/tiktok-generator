@@ -94,6 +94,13 @@ export class RemotionService {
         throw new Error('Remotion bundle not prepared. Call prepareComposition() first.');
       }
 
+      console.log('🔍 Calling selectComposition with inputProps:', {
+        bundleLocation: this.bundleLocation,
+        compositionId: 'VideoQuiz',
+        inputPropsKeys: Object.keys(props),
+        timingData: props.timing
+      });
+
       // Get composition details
       const compositions = await selectComposition({
         serveUrl: this.bundleLocation,
@@ -101,13 +108,35 @@ export class RemotionService {
         inputProps: props as unknown as Record<string, unknown>,
       });
 
-      console.log('Selected composition:', {
+      console.log('📊 Selected composition result:', {
         id: compositions.id,
         width: compositions.width,
         height: compositions.height,
         fps: compositions.fps,
         durationInFrames: compositions.durationInFrames,
+        durationInSeconds: (compositions.durationInFrames / compositions.fps).toFixed(2) + 's'
       });
+
+      // Calculate expected duration manually to compare
+      const expectedDuration = this.calculateVideoDuration(props.timing);
+      const expectedFrames = Math.round(expectedDuration * compositions.fps);
+      
+      console.log('🔍 Duration comparison:', {
+        expectedDurationSeconds: expectedDuration,
+        expectedFrames: expectedFrames,
+        actualFrames: compositions.durationInFrames,
+        difference: compositions.durationInFrames - expectedFrames
+      });
+
+      if (Math.abs(compositions.durationInFrames - expectedFrames) > 30) {
+        console.log('⚠️  DURATION MISMATCH DETECTED! calculateMetadata may not be working correctly');
+        console.log('🔧 FIXING: Manually overriding durationInFrames with correct value');
+        
+        // Przesłoń durationInFrames z poprawną wartością
+        compositions.durationInFrames = expectedFrames;
+        
+        console.log('✅ FIXED: durationInFrames set to', expectedFrames, 'frames (', (expectedFrames/compositions.fps).toFixed(2), 'seconds)');
+      }
 
       // Setup progress callback
       let lastProgress = 0;

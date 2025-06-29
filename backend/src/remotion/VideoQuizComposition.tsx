@@ -133,6 +133,7 @@ export const VideoQuizCompositionConfig = {
   id: 'VideoQuiz',
   component: VideoQuizComposition,
   durationInFrames: (timing: any, questionCount: number, fps: number = 30) => {
+    console.log('timing', timing);
     if (!timing) {
       // Fallback to default durations if timing not provided
       return 90 + (questionCount * (120 + 90 + 90)) + 120; // Old hardcoded values
@@ -146,6 +147,14 @@ export const VideoQuizCompositionConfig = {
       total + Math.round(duration * fps), 0);
     const answersDuration = timing.answers.reduce((total: number, duration: number) => 
       total + Math.round(duration * fps), 0);
+
+    console.log({
+      "introDuration": introDuration,
+      "questionsDuration": questionsDuration,
+      "timerDuration": timerDuration,
+      "answersDuration": answersDuration,
+      outroDuration,
+    })
     
     return introDuration + questionsDuration + (questionCount * timerDuration) + answersDuration + outroDuration;
   },
