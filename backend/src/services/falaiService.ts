@@ -19,7 +19,7 @@ export class FalAIService {
    * Generate background image for intro scene based on quiz topic
    */
   async generateIntroBackground(topic: string, outputDir: string): Promise<string> {
-    const prompt = this.generatePrompt(topic, `Introduction to a quiz about ${topic}`);
+    const prompt = this.generatePrompt(topic, 'intro', false);
     return this.generateAndSaveImage(prompt, outputDir, 'intro-bg');
   }
 
@@ -28,7 +28,8 @@ export class FalAIService {
    */
   async generateQuestionBackground(question: string, index: number, outputDir: string): Promise<string> {
     const topic = this.extractTopicFromQuestion(question);
-    const prompt = this.generatePrompt(topic, question);
+    // Use generic prompt that doesn't reveal question content
+    const prompt = this.generatePrompt(topic, 'question', false);
     return this.generateAndSaveImage(prompt, outputDir, `question-${index + 1}-bg`);
   }
 
@@ -36,19 +37,30 @@ export class FalAIService {
    * Generate background image for outro scene
    */
   async generateOutroBackground(topic: string, outputDir: string): Promise<string> {
-    const prompt = this.generatePrompt(topic, `Conclusion of a quiz about ${topic}`);
+    const prompt = this.generatePrompt(topic, 'outro', false);
     return this.generateAndSaveImage(prompt, outputDir, 'outro-bg');
   }
 
   /**
    * Generate unified prompt for all background types
    * Based on proven approach from previous project - optimized for realism
+   * Modified to not reveal question answers - uses only thematic elements
    */
-  private generatePrompt(topic: string, context: string): string {
-    console.log(`Generating realistic prompt for topic: ${topic}`);
+  private generatePrompt(topic: string, sceneType: string, includeSpecificContext: boolean = true): string {
+    console.log(`Generating realistic thematic prompt for topic: ${topic}, scene: ${sceneType}`);
     
-    // Base prompt with topic and context - enhanced for realism
-    const basePrompt = `Create a high-quality, photorealistic illustration related to ${topic} that visually represents the concept or ideas behind the following context: "${context}". The image should be conceptually meaningful, visually engaging, and suitable for use in an educational or thought-provoking context.`;
+    // Create generic, thematic prompt that doesn't reveal answers
+    let basePrompt: string;
+    if (sceneType === 'intro') {
+      basePrompt = `Create a high-quality, photorealistic illustration that represents the general theme and atmosphere of ${topic}. The image should be welcoming, educational, and set an engaging mood for learning about this subject.`;
+    } else if (sceneType === 'question') {
+      basePrompt = `Create a high-quality, photorealistic illustration that captures the essence and general theme of ${topic}. The image should be neutral, educational, and visually interesting without depicting specific details, facts, or answers related to ${topic}. Focus on abstract or atmospheric elements that evoke the subject matter.`;
+    } else if (sceneType === 'outro') {
+      basePrompt = `Create a high-quality, photorealistic illustration that represents completion and conclusion related to the theme of ${topic}. The image should have a sense of accomplishment and summary without revealing specific information about the subject.`;
+    } else {
+      // Fallback for any other scene type
+      basePrompt = `Create a high-quality, photorealistic illustration related to the general theme of ${topic}. The image should be neutral and educational without revealing specific facts or details.`;
+    }
     
     // Style specifications for realism
     const stylePrompt = 'Use a realistic, photographic art style with natural lighting, detailed textures, and lifelike colors. Avoid cartoon, anime, or overly stylized elements. The image should look like a professional photograph or highly detailed digital artwork.';
@@ -59,12 +71,12 @@ export class FalAIService {
     // TikTok format requirements
     const formatPrompt = 'vertical 9:16 aspect ratio, mobile-optimized, TikTok format';
     
-    // Technical requirements
-    const technicalPrompt = 'no text overlays, no watermarks, clean composition, suitable for background use';
+    // Technical requirements - enhanced to avoid revealing content
+    const technicalPrompt = 'no text overlays, no watermarks, no specific facts or answers, no detailed information, clean composition, suitable for background use, abstract or atmospheric approach';
     
     const fullPrompt = `${basePrompt} ${stylePrompt} ${qualityPrompt} ${formatPrompt}, ${technicalPrompt}`;
     
-    console.log(`Generated realistic prompt: "${fullPrompt.substring(0, 100)}..."`);
+    console.log(`Generated neutral thematic prompt: "${fullPrompt.substring(0, 100)}..."`);
     
     return fullPrompt;
   }

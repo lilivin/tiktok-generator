@@ -138,25 +138,6 @@ export const AnswerScene: React.FC<AnswerSceneProps> = ({
             {answer}
           </h1>
         </div>
-
-        {/* Success indicator */}
-        <div
-          style={{
-            marginTop: '40px',
-            opacity: textOpacity,
-            transform: `scale(${textScale})`,
-          }}
-        >
-          <div
-            style={{
-              fontSize: '48px',
-              color: '#00FF00',
-              textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
-            }}
-          >
-            ✓
-          </div>
-        </div>
       </AbsoluteFill>
 
       {/* Audio track */}
