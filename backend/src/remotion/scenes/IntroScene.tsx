@@ -123,12 +123,12 @@ export const IntroScene: React.FC<IntroSceneProps> = ({
           </h1>
           <h2
             style={{
-              fontSize: '48px',
+              fontSize: '100px',
               fontWeight: '800',
               fontFamily: 'Poppins, Arial, sans-serif',
               color: '#FFD700', // Golden color for emphasis
               textShadow: '4px 4px 8px rgba(0,0,0,0.8)',
-              margin: '10px 0 0 0',
+              margin: '10px 0 50px 0',
               textTransform: 'uppercase',
               letterSpacing: '1px',
             }}

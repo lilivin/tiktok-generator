@@ -27,7 +27,7 @@ export const AnswerScene: React.FC<AnswerSceneProps> = ({
   const backgroundScale = interpolate(
     frame,
     [0, durationInFrames],
-    [1.1, 1], // Reverse Ken Burns (zoom out)
+    [1, 1.1],
     { extrapolateRight: 'clamp' }
   );
 

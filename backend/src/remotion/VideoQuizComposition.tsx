@@ -14,7 +14,6 @@ import {
 import { VideoCompositionProps } from '../types';
 import { IntroScene } from './scenes/IntroScene';
 import { QuestionScene } from './scenes/QuestionScene';
-import { TimerScene } from './scenes/TimerScene';
 import { AnswerScene } from './scenes/AnswerScene';
 import { OutroScene } from './scenes/OutroScene';
 
@@ -34,7 +33,7 @@ export const VideoQuizComposition: React.FC<VideoCompositionProps> = ({
   const answerDurationFrames = timing.answers.map(d => Math.round(d * fps));
   const outroDurationFrames = Math.round(timing.outro * fps);
   
-  // Calculate total duration
+  // Calculate total duration - now questions include timer
   const totalDuration = introDurationFrames + 
     questions.reduce((total, _, index) => 
       total + questionDurationFrames[index] + timerDurationFrames + answerDurationFrames[index], 0
@@ -45,7 +44,7 @@ export const VideoQuizComposition: React.FC<VideoCompositionProps> = ({
   timing.questions.forEach((seconds, i) => {
     console.log(`  Question ${i + 1}: ${seconds}s → ${questionDurationFrames[i]} frames`);
   });
-  console.log(`  Timer: ${timing.timer}s → ${timerDurationFrames} frames`);
+  console.log(`  Timer: ${timing.timer}s → ${timerDurationFrames} frames (integrated in questions)`);
   timing.answers.forEach((seconds, i) => {
     console.log(`  Answer ${i + 1}: ${seconds}s → ${answerDurationFrames[i]} frames`);
   });
@@ -74,38 +73,32 @@ export const VideoQuizComposition: React.FC<VideoCompositionProps> = ({
       </Sequence>
       {currentFrame += introDurationFrames}
 
-      {/* Question Sequences - now with dynamic timing */}
+      {/* Question Sequences - now with integrated timer */}
       {questions.map((question, index) => {
         const questionStart = currentFrame;
         const questionDuration = questionDurationFrames[index];
-        const timerStart = questionStart + questionDuration;
-        const answerStart = timerStart + timerDurationFrames;
+        const questionWithTimerDuration = questionDuration + timerDurationFrames;
+        const answerStart = questionStart + questionWithTimerDuration;
         const answerDuration = answerDurationFrames[index];
         
         // Update currentFrame for next iteration
-        currentFrame += questionDuration + timerDurationFrames + answerDuration;
+        currentFrame += questionWithTimerDuration + answerDuration;
         
         return (
           <React.Fragment key={`question-${index}`}>
-            {/* Question Scene - dynamic duration based on audio */}
-            <Sequence from={questionStart} durationInFrames={questionDuration}>
+            {/* Question Scene with integrated timer */}
+            <Sequence from={questionStart} durationInFrames={questionWithTimerDuration}>
               <QuestionScene
                 question={question.question}
                 backgroundImage={backgroundImages[index + 1]}
                 audioFile={audioFiles.questions[index]?.path}
                 questionNumber={index + 1}
+                timerDuration={timing.timer}
+                audioEndFrame={questionDuration}
               />
             </Sequence>
 
-            {/* Timer Scene - fixed 3 seconds */}
-            <Sequence from={timerStart} durationInFrames={timerDurationFrames}>
-              <TimerScene
-                backgroundImage={backgroundImages[index + 1]}
-                duration={timerDurationFrames}
-              />
-            </Sequence>
-
-            {/* Answer Scene - dynamic duration based on audio */}
+            {/* Answer Scene */}
             <Sequence from={answerStart} durationInFrames={answerDuration}>
               <AnswerScene
                 answer={question.answer}
@@ -148,10 +141,11 @@ export const VideoQuizCompositionConfig = {
     const answersDuration = timing.answers.reduce((total: number, duration: number) => 
       total + Math.round(duration * fps), 0);
 
+    // Timer is now integrated in questions, not separate
     console.log({
       "introDuration": introDuration,
       "questionsDuration": questionsDuration,
-      "timerDuration": timerDuration,
+      "integratedTimerDuration": timerDuration * questionCount,
       "answersDuration": answersDuration,
       outroDuration,
     })

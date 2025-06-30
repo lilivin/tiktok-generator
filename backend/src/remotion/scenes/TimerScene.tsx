@@ -1,8 +1,10 @@
 import React from 'react';
 import {
   AbsoluteFill,
+  Audio,
   Img,
   interpolate,
+  staticFile,
   useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
@@ -47,6 +49,14 @@ export const TimerScene: React.FC<TimerSceneProps> = ({
 
   return (
     <AbsoluteFill>
+      {/* Timer Sound Effect */}
+      <Audio
+        src={staticFile('timer-sound.wav')}
+        volume={0.8}
+        startFrom={0}
+        endAt={duration}
+      />
+
       {/* Background */}
       <AbsoluteFill style={{ overflow: 'hidden' }}>
         <Img

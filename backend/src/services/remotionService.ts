@@ -45,11 +45,15 @@ export class RemotionService {
       if (!this.bundleLocation) {
         console.log('Bundling Remotion project...');
         const entryPoint = path.join(__dirname, '../remotion/Root.tsx');
+        const publicDir = path.join(__dirname, '../../public'); // Point to backend/public
+        
         this.bundleLocation = await bundle({
           entryPoint,
+          publicDir,
           webpackOverride: (config) => config,
         });
         console.log(`Remotion bundle created at: ${this.bundleLocation}`);
+        console.log(`Public directory: ${publicDir}`);
       }
       
       // Log composition structure for debugging

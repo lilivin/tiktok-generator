@@ -1,6 +1,7 @@
 import React from 'react';
 import { Composition, registerRoot } from 'remotion';
 import { VideoQuizComposition, VideoQuizCompositionConfig } from './VideoQuizComposition';
+import { IntroScene } from './scenes/IntroScene';
 
 // Import video composition props type
 import type { VideoCompositionProps } from '../types';
@@ -23,24 +24,16 @@ export const RemotionRoot: React.FC = () => {
       { question: 'Sample question 3?', answer: 'Sample answer 3' },
     ],
     backgroundImages: [
-      'path/to/intro-bg.jpg',
-      'path/to/question1-bg.jpg', 
-      'path/to/question2-bg.jpg',
-      'path/to/question3-bg.jpg',
+      'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&h=1080&fit=crop',
+      'https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?w=1920&h=1080&fit=crop',
+      'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1920&h=1080&fit=crop',
+      'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1920&h=1080&fit=crop',
     ],
     audioFiles: {
-      intro: { path: 'path/to/intro.mp3', duration: 3 },
-      questions: [
-        { path: 'path/to/question1.mp3', duration: 4 },
-        { path: 'path/to/question2.mp3', duration: 4 },
-        { path: 'path/to/question3.mp3', duration: 4 },
-      ],
-      answers: [
-        { path: 'path/to/answer1.mp3', duration: 3 },
-        { path: 'path/to/answer2.mp3', duration: 3 },
-        { path: 'path/to/answer3.mp3', duration: 3 },
-      ],
-      outro: { path: 'path/to/outro.mp3', duration: 4 },
+      intro: undefined, // Wyłączone dla testów
+      questions: [],
+      answers: [],
+      outro: undefined,
     },
     timing: defaultTiming
   };
