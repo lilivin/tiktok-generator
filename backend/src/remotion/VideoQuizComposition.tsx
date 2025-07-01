@@ -81,6 +81,11 @@ export const VideoQuizComposition: React.FC<VideoCompositionProps> = ({
         const answerStart = questionStart + questionWithTimerDuration;
         const answerDuration = answerDurationFrames[index];
         
+        // Calculate background image indices
+        // Structure: [0] = intro, [1] = question1, [2] = answer1, [3] = question2, [4] = answer2, ...
+        const questionBgIndex = 1 + (index * 2); // 1, 3, 5, ...
+        const answerBgIndex = 2 + (index * 2);   // 2, 4, 6, ...
+        
         // Update currentFrame for next iteration
         currentFrame += questionWithTimerDuration + answerDuration;
         
@@ -90,7 +95,7 @@ export const VideoQuizComposition: React.FC<VideoCompositionProps> = ({
             <Sequence from={questionStart} durationInFrames={questionWithTimerDuration}>
               <QuestionScene
                 question={question.question}
-                backgroundImage={backgroundImages[index + 1]}
+                backgroundImage={backgroundImages[questionBgIndex]}
                 audioFile={audioFiles.questions[index]?.path}
                 questionNumber={index + 1}
                 timerDuration={timing.timer}
@@ -102,7 +107,7 @@ export const VideoQuizComposition: React.FC<VideoCompositionProps> = ({
             <Sequence from={answerStart} durationInFrames={answerDuration}>
               <AnswerScene
                 answer={question.answer}
-                backgroundImage={backgroundImages[index + 1]}
+                backgroundImage={backgroundImages[answerBgIndex]}
                 audioFile={audioFiles.answers[index]?.path}
               />
             </Sequence>

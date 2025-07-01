@@ -171,8 +171,7 @@ export class VideoService {
 
   private async generateBackgrounds(job: VideoJob, outputDir: string): Promise<string[]> {
     try {
-      const questions = job.questions.map(q => q.question);
-      return await this.falaiService.generateAllBackgrounds(job.topic, questions, outputDir);
+      return await this.falaiService.generateAllBackgrounds(job.topic, job.questions, outputDir);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`Błąd generowania obrazów tła: ${errorMessage}`);

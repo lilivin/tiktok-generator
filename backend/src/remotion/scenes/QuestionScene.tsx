@@ -141,7 +141,7 @@ export const QuestionScene: React.FC<QuestionSceneProps> = ({
         >
           <div
             style={{
-              fontSize: '36px',
+              fontSize: '72px',
               fontWeight: '700',
               fontFamily: 'Poppins, Arial, sans-serif',
               color: '#FFD700',
@@ -165,7 +165,7 @@ export const QuestionScene: React.FC<QuestionSceneProps> = ({
         >
           <h1
             style={{
-              fontSize: '48px',
+              fontSize: '56px',
               fontWeight: '800',
               fontFamily: 'Poppins, Arial, sans-serif',
               color: '#FFFFFF',

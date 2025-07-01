@@ -146,7 +146,7 @@ export const IntroScene: React.FC<IntroSceneProps> = ({
         >
           <h3
             style={{
-              fontSize: '42px',
+              fontSize: '56px',
               fontWeight: '700',
               fontFamily: 'Poppins, Arial, sans-serif',
               color: '#FFFFFF',

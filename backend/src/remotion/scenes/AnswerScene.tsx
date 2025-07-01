@@ -96,7 +96,7 @@ export const AnswerScene: React.FC<AnswerSceneProps> = ({
         >
           <div
             style={{
-              fontSize: '32px',
+              fontSize: '72px',
               fontWeight: '600',
               fontFamily: 'Poppins, Arial, sans-serif',
               color: '#00FF00',

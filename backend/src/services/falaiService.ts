@@ -2,7 +2,7 @@ import axios, { AxiosResponse } from 'axios';
 import fs from 'fs/promises';
 import path from 'path';
 import sharp from 'sharp';
-import { FalAIImageResponse } from '../types';
+import { FalAIImageResponse, Question } from '../types';
 
 export class FalAIService {
   private apiKey: string;
@@ -42,6 +42,14 @@ export class FalAIService {
   }
 
   /**
+   * Generate background image for answer scene - specific to the answer content
+   */
+  async generateAnswerBackground(answer: string, topic: string, index: number, outputDir: string): Promise<string> {
+    const prompt = this.generateAnswerPrompt(answer, topic);
+    return this.generateAndSaveImage(prompt, outputDir, `answer-${index + 1}-bg`);
+  }
+
+  /**
    * Generate unified prompt for all background types
    * Based on proven approach from previous project - optimized for realism
    * Modified to not reveal question answers - uses only thematic elements
@@ -77,6 +85,35 @@ export class FalAIService {
     const fullPrompt = `${basePrompt} ${stylePrompt} ${qualityPrompt} ${formatPrompt}, ${technicalPrompt}`;
     
     console.log(`Generated neutral thematic prompt: "${fullPrompt.substring(0, 100)}..."`);
+    
+    return fullPrompt;
+  }
+
+  /**
+   * Generate prompt specifically for answer scenes
+   * This prompt should create backgrounds that are related to the answer content
+   */
+  private generateAnswerPrompt(answer: string, topic: string): string {
+    console.log(`Generating answer-specific prompt for answer: ${answer}, topic: ${topic}`);
+    
+    // Create a prompt that includes the answer content to make background related to the correct answer
+    const basePrompt = `Create a high-quality, photorealistic illustration that visually represents and relates to the concept of "${answer}" in the context of ${topic}. The image should clearly connect to this specific answer while maintaining educational and professional quality. Show elements, symbols, or scenes that directly relate to "${answer}".`;
+    
+    // Style specifications for realism
+    const stylePrompt = 'Use a realistic, photographic art style with natural lighting, detailed textures, and lifelike colors. Avoid cartoon, anime, or overly stylized elements. The image should look like a professional photograph or highly detailed digital artwork.';
+    
+    // Quality and technical specifications
+    const qualityPrompt = 'High resolution, sharp focus, professional photography quality, natural color grading, proper depth of field, realistic shadows and highlights.';
+    
+    // TikTok format requirements
+    const formatPrompt = 'vertical 9:16 aspect ratio, mobile-optimized, TikTok format';
+    
+    // Technical requirements for answer scene
+    const technicalPrompt = 'no text overlays, no watermarks, clean composition, suitable for background use, visually represents the answer content, celebratory and positive mood';
+    
+    const fullPrompt = `${basePrompt} ${stylePrompt} ${qualityPrompt} ${formatPrompt}, ${technicalPrompt}`;
+    
+    console.log(`Generated answer-specific prompt: "${fullPrompt.substring(0, 100)}..."`);
     
     return fullPrompt;
   }
@@ -181,7 +218,7 @@ export class FalAIService {
   /**
    * Generate all background images for a video job
    */
-  async generateAllBackgrounds(topic: string, questions: string[], outputDir: string): Promise<string[]> {
+  async generateAllBackgrounds(topic: string, questions: Question[], outputDir: string): Promise<string[]> {
     const backgroundPaths: string[] = [];
     
     try {
@@ -189,14 +226,20 @@ export class FalAIService {
       const introbg = await this.generateIntroBackground(topic, outputDir);
       backgroundPaths.push(introbg);
 
-      // Generate background for each question
+      // Generate background for each question and its answer
       for (let i = 0; i < questions.length; i++) {
-        const question = questions[i];
-        if (!question) {
+        const questionObj = questions[i];
+        if (!questionObj) {
           throw new Error(`Question at index ${i} is undefined`);
         }
-        const questionBg = await this.generateQuestionBackground(question, i, outputDir);
+        
+        // Generate question background (neutral)
+        const questionBg = await this.generateQuestionBackground(questionObj.question, i, outputDir);
         backgroundPaths.push(questionBg);
+        
+        // Generate answer background (specific to answer content)
+        const answerBg = await this.generateAnswerBackground(questionObj.answer, topic, i, outputDir);
+        backgroundPaths.push(answerBg);
       }
 
       // Generate outro background
