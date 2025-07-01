@@ -21,6 +21,7 @@ export const VideoQuizComposition: React.FC<VideoCompositionProps> = ({
   topic,
   questions,
   backgroundImages,
+  questionImages,
   audioFiles,
   timing,
 }) => {
@@ -100,6 +101,7 @@ export const VideoQuizComposition: React.FC<VideoCompositionProps> = ({
                 questionNumber={index + 1}
                 timerDuration={timing.timer}
                 audioEndFrame={questionDuration}
+                questionImage={questionImages[index]}
               />
             </Sequence>
 

@@ -3,6 +3,7 @@
 export interface Question {
   question: string;
   answer: string;
+  image?: string; // Path to uploaded image file
 }
 
 export interface QuizFormData {
@@ -39,6 +40,7 @@ export interface AudioWithDuration {
 // Backend-specific types
 export interface VideoAssets {
   backgroundImages: string[]; // Paths to generated background images
+  questionImages: string[]; // Paths to uploaded question images (same order as questions)
   audioFiles: {
     intro?: AudioWithDuration;
     questions: AudioWithDuration[]; // Audio for each question with duration
@@ -89,6 +91,7 @@ export interface VideoCompositionProps {
   topic: string;
   questions: Question[];
   backgroundImages: string[];
+  questionImages: string[]; // Paths to question images (same order as questions)
   audioFiles: {
     intro?: AudioWithDuration;
     questions: AudioWithDuration[];

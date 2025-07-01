@@ -17,6 +17,7 @@ interface QuestionSceneProps {
   questionNumber: number;
   timerDuration?: number; // Duration of timer in seconds
   audioEndFrame?: number; // Frame when audio ends to start timer
+  questionImage?: string; // Optional image for the question
 }
 
 export const QuestionScene: React.FC<QuestionSceneProps> = ({
@@ -26,6 +27,7 @@ export const QuestionScene: React.FC<QuestionSceneProps> = ({
   questionNumber,
   timerDuration = 15, // Default 15 seconds for timer
   audioEndFrame = 180, // Default 6 seconds at 30fps
+  questionImage,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
@@ -56,6 +58,20 @@ export const QuestionScene: React.FC<QuestionSceneProps> = ({
 
   const textScale = interpolate(textEntrance, [0, 1], [0.9, 1]);
   const textOpacity = interpolate(textEntrance, [0, 1], [0, 1]);
+
+  // Question image animation - slide in from left
+  const questionImageEntrance = spring({
+    frame: frame - 15,
+    fps,
+    config: {
+      damping: 12,
+      stiffness: 300,
+      mass: 0.6,
+    },
+  });
+
+  const questionImageTranslateX = interpolate(questionImageEntrance, [0, 1], [-100, 0]);
+  const questionImageOpacity = interpolate(questionImageEntrance, [0, 1], [0, 1]);
 
   // Timer calculations
   const timerFrame = frame - timerStartFrame;
@@ -156,6 +172,35 @@ export const QuestionScene: React.FC<QuestionSceneProps> = ({
           </div>
         </div>
 
+        {/* Question Image (if provided) */}
+        {questionImage && (
+          <div
+            style={{
+              opacity: questionImageOpacity,
+              transform: `translateX(${questionImageTranslateX}px)`,
+              marginBottom: '30px',
+            }}
+          >
+            <div
+              style={{
+                borderRadius: '20px',
+                border: '5px solid #FFD700',
+              }}
+            >
+              <Img
+                src={questionImage}
+                style={{
+                  width: 'auto',
+                  height: 'auto',
+                  maxHeight: '400px',
+                  objectFit: 'contain',
+                  borderRadius: '12px',
+                }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Question text */}
         <div
           style={{
@@ -187,7 +232,7 @@ export const QuestionScene: React.FC<QuestionSceneProps> = ({
       {isTimerActive && (
         <AbsoluteFill
           style={{
-            top: '300px',
+            top: '200px',
             paddingTop: '80px',
             pointerEvents: 'none',
           }}

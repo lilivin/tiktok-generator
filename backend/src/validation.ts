@@ -11,6 +11,17 @@ export const questionSchema = z.object({
     .min(1, "Odpowiedź jest wymagana")
     .min(2, "Odpowiedź musi mieć co najmniej 2 znaki")
     .max(100, "Odpowiedź nie może być dłuższa niż 100 znaków"),
+  image: z
+    .string()
+    .optional()
+    .refine(
+      (imageData) => {
+        if (!imageData) return true; // Optional field
+        // Check if it's a valid base64 data URL
+        return /^data:image\/(jpeg|jpg|png|webp);base64,/.test(imageData);
+      },
+      "Obrazek musi być w formacie base64 data URL (JPEG, PNG, WebP)"
+    ),
 });
 
 export const videoGenerationRequestSchema = z.object({

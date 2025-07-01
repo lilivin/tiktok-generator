@@ -3,6 +3,7 @@
 export interface Question {
   question: string;
   answer: string;
+  image?: File | string; // File for frontend, string path for backend
 }
 
 export interface QuizFormData {

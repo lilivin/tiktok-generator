@@ -133,29 +133,34 @@ export class VideoService {
       const jobDir = path.join(this.outputDir, `job-${jobId}`);
       await fs.mkdir(jobDir, { recursive: true });
 
-      // Step 1: Generate background images with Fal.ai
-      await this.updateJobStatus(jobId, 'processing', undefined, 20, 'Generowanie obrazów tła z AI...');
+      // Step 1: Process question images (if any)
+      await this.updateJobStatus(jobId, 'processing', undefined, 15, 'Przetwarzanie obrazków pytań...');
+      const questionImages = await this.processQuestionImages(job, jobDir);
+
+      // Step 2: Generate background images with Fal.ai
+      await this.updateJobStatus(jobId, 'processing', undefined, 25, 'Generowanie obrazów tła z AI...');
       const backgroundImages = await this.generateBackgrounds(job, jobDir);
 
-      // Step 2: Generate voice narration with ElevenLabs
-      await this.updateJobStatus(jobId, 'processing', undefined, 40, 'Synteza głosu lektora...');
+      // Step 3: Generate voice narration with ElevenLabs
+      await this.updateJobStatus(jobId, 'processing', undefined, 45, 'Synteza głosu lektora...');
       const audioFiles = await this.generateVoice(job, jobDir);
 
       // Store generated assets in job
       job.assets = {
         backgroundImages,
+        questionImages,
         audioFiles,
       };
 
-      // Step 3: Compose video with Remotion
-      await this.updateJobStatus(jobId, 'processing', undefined, 60, 'Kompozycja elementów wideo...');
+      // Step 4: Compose video with Remotion
+      await this.updateJobStatus(jobId, 'processing', undefined, 65, 'Kompozycja elementów wideo...');
       await this.composeVideo(job);
 
-      // Step 4: Render final video with Remotion
-      await this.updateJobStatus(jobId, 'processing', undefined, 80, 'Renderowanie finalnego wideo...');
+      // Step 5: Render final video with Remotion
+      await this.updateJobStatus(jobId, 'processing', undefined, 85, 'Renderowanie finalnego wideo...');
       const outputPath = await this.renderVideo(job, jobDir);
 
-      // Step 5: Complete
+      // Step 6: Complete
       job.filePath = outputPath;
       await this.updateJobStatus(jobId, 'completed', undefined, 100, 'Wideo gotowe do pobrania!');
 
@@ -166,6 +171,49 @@ export class VideoService {
       
       // Cleanup on failure
       await this.cleanupJobAssets(jobId);
+    }
+  }
+
+  private async processQuestionImages(job: VideoJob, outputDir: string): Promise<string[]> {
+    const questionImages: string[] = [];
+
+    try {
+      for (let i = 0; i < job.questions.length; i++) {
+        const question = job.questions[i];
+        
+        if (question.image) {
+          // Extract base64 data from data URL
+          const matches = question.image.match(/^data:image\/([a-zA-Z]*);base64,(.*)$/);
+          
+          if (!matches || matches.length !== 3) {
+            console.warn(`Invalid base64 image format for question ${i + 1}, skipping...`);
+            questionImages.push(''); // Empty string for no image
+            continue;
+          }
+
+          const imageType = matches[1]; // jpeg, png, webp
+          const base64Data = matches[2];
+          
+          // Create filename
+          const filename = `question-${i + 1}-image.${imageType === 'jpeg' ? 'jpg' : imageType}`;
+          const imagePath = path.join(outputDir, filename);
+          
+          // Convert base64 to buffer and save
+          const buffer = Buffer.from(base64Data, 'base64');
+          await fs.writeFile(imagePath, buffer);
+          
+          questionImages.push(imagePath);
+          console.log(`Saved question image: ${filename}`);
+        } else {
+          questionImages.push(''); // Empty string for no image
+        }
+      }
+
+      return questionImages;
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Błąd przetwarzania obrazków pytań: ${errorMessage}`);
     }
   }
 
@@ -211,6 +259,7 @@ export class VideoService {
         topic: job.topic,
         questions: job.questions,
         backgroundImages: httpAssets.backgroundImages,
+        questionImages: httpAssets.questionImages,
         audioFiles: httpAssets.audioFiles,
         timing
       });
@@ -239,6 +288,7 @@ export class VideoService {
         topic: job.topic,
         questions: job.questions,
         backgroundImages: httpAssets.backgroundImages,
+        questionImages: httpAssets.questionImages,
         audioFiles: httpAssets.audioFiles,
         timing
       }, outputPath, (progress: number) => {
@@ -313,6 +363,9 @@ export class VideoService {
   private convertAssetsToHttpUrls(assets: VideoAssets, jobId: string): VideoAssets {
     return {
       backgroundImages: assets.backgroundImages.map(path => this.convertToHttpUrl(path, jobId)),
+      questionImages: assets.questionImages.map(path => 
+        path ? this.convertToHttpUrl(path, jobId) : '' // Keep empty strings as is
+      ),
       audioFiles: {
         intro: assets.audioFiles.intro ? {
           ...assets.audioFiles.intro,

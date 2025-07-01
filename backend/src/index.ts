@@ -12,7 +12,8 @@ import type { VideoGenerationResponse } from './types';
 dotenv.config({ path: '../.env' });
 
 const fastify = Fastify({
-  logger: true
+  logger: true,
+  bodyLimit: 100 * 1024 * 1024 // 100MB limit for request body (multiple images + base64 encoding overhead)
 });
 
 // Register plugins

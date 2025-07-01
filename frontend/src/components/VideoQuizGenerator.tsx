@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus, Trash2, Loader2, Download, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Plus, Trash2, Loader2, Download, AlertTriangle, CheckCircle, Upload, X, Image as ImageIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,19 +20,44 @@ export default function VideoQuizGenerator() {
   });
   const [videoId, setVideoId] = useState<string | null>(null);
 
+  // State for image previews and size tracking
+  const [imagePreviews, setImagePreviews] = useState<{ [key: number]: string }>({});
+  const [dragStates, setDragStates] = useState<{ [key: number]: boolean }>({});
+  const [imageSizes, setImageSizes] = useState<{ [key: number]: number }>({});
+
+  // Image size limits
+  const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB per image
+  const MAX_TOTAL_SIZE = 20 * 1024 * 1024; // 20MB total for all images
+
+  // Helper function to format file size
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  // Calculate total size of all images
+  const getTotalImageSize = (): number => {
+    return Object.values(imageSizes).reduce((total, size) => total + size, 0);
+  };
+
   const {
     register,
     control,
     handleSubmit,
     formState: { errors, isSubmitting },
     watch,
+    setError,
+    clearErrors,
   } = useForm<QuizFormData>({
     resolver: zodResolver(quizFormSchema),
     defaultValues: {
       topic: '',
       questions: [
-        { question: '', answer: '' },
-        { question: '', answer: '' },
+        { question: '', answer: '', image: undefined },
+        { question: '', answer: '', image: undefined },
       ],
     },
   });
@@ -57,8 +82,60 @@ export default function VideoQuizGenerator() {
     }
   }, [generationStatus.status]);
 
+  // Clean up object URLs on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(imagePreviews).forEach(url => {
+        URL.revokeObjectURL(url);
+      });
+    };
+  }, []);
+
+  // Convert File to base64 string
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
+
   const onSubmit = async (data: QuizFormData) => {
     try {
+      // Validate total image size before processing
+      const totalImageSize = getTotalImageSize();
+      if (totalImageSize > MAX_TOTAL_SIZE) {
+        setGenerationStatus({
+          status: 'error',
+          error: `Łączny rozmiar obrazków (${formatFileSize(totalImageSize)}) przekracza limit ${formatFileSize(MAX_TOTAL_SIZE)}. Zmniejsz rozmiar lub usuń niektóre obrazki.`,
+        });
+        return;
+      }
+
+      setGenerationStatus({
+        status: 'generating',
+        step: 'Przygotowywanie danych...',
+        progress: 5,
+      });
+
+      // Convert image files to base64 strings
+      const questionsWithBase64Images = await Promise.all(
+        data.questions.map(async (question) => {
+          if (question.image && question.image instanceof File) {
+            const base64Image = await fileToBase64(question.image);
+            return {
+              ...question,
+              image: base64Image,
+            };
+          }
+          return {
+            ...question,
+            image: undefined,
+          };
+        })
+      );
+
       setGenerationStatus({
         status: 'generating',
         step: 'Inicjalizacja procesu generowania...',
@@ -67,7 +144,7 @@ export default function VideoQuizGenerator() {
 
       const response = await apiClient.generateVideo({
         topic: data.topic,
-        questions: data.questions,
+        questions: questionsWithBase64Images,
       });
 
       if (response.success && response.videoId) {
@@ -149,14 +226,136 @@ export default function VideoQuizGenerator() {
 
   const addQuestion = () => {
     if (questionsCount < 5) {
-      append({ question: '', answer: '' });
+      append({ question: '', answer: '', image: undefined });
     }
   };
 
   const removeQuestion = (index: number) => {
     if (questionsCount > 2) {
+      // Clean up image preview when removing question
+      if (imagePreviews[index]) {
+        URL.revokeObjectURL(imagePreviews[index]);
+        const newPreviews = { ...imagePreviews };
+        delete newPreviews[index];
+        setImagePreviews(newPreviews);
+      }
+      
+      // Clean up image size tracking
+      const newSizes = { ...imageSizes };
+      delete newSizes[index];
+      setImageSizes(newSizes);
+      
+      // Clear any validation errors for this question
+      clearErrors(`questions.${index}` as any);
+      
       remove(index);
     }
+  };
+
+  // Handle image upload with better file handling
+  const handleImageUpload = (index: number, file: File | null) => {
+    if (file) {
+      // Validate file size
+      if (file.size > MAX_IMAGE_SIZE) {
+        setError(`questions.${index}.image` as any, {
+          type: 'manual',
+          message: `Obrazek jest za duży. Maksymalny rozmiar to ${formatFileSize(MAX_IMAGE_SIZE)}.`
+        });
+        return;
+      }
+
+      // Check if adding this file would exceed total limit
+      const currentTotalSize = getTotalImageSize();
+      const previousFileSize = imageSizes[index] || 0;
+      const newTotalSize = currentTotalSize - previousFileSize + file.size;
+
+      if (newTotalSize > MAX_TOTAL_SIZE) {
+        const remainingSpace = MAX_TOTAL_SIZE - (currentTotalSize - previousFileSize);
+        setError(`questions.${index}.image` as any, {
+          type: 'manual',
+          message: `Przekroczono limit wszystkich obrazków (${formatFileSize(MAX_TOTAL_SIZE)}). Dostępne miejsce: ${formatFileSize(remainingSpace)}.`
+        });
+        return;
+      }
+
+      // Clear any previous errors for this field
+      clearErrors(`questions.${index}.image` as any);
+
+      // Create preview URL and update size tracking
+      const previewUrl = URL.createObjectURL(file);
+      setImagePreviews(prev => ({ ...prev, [index]: previewUrl }));
+      setImageSizes(prev => ({ ...prev, [index]: file.size }));
+    } else {
+      // Remove preview and size tracking
+      if (imagePreviews[index]) {
+        URL.revokeObjectURL(imagePreviews[index]);
+        const newPreviews = { ...imagePreviews };
+        delete newPreviews[index];
+        setImagePreviews(newPreviews);
+      }
+      
+      const newSizes = { ...imageSizes };
+      delete newSizes[index];
+      setImageSizes(newSizes);
+      
+      // Clear errors for this field
+      clearErrors(`questions.${index}.image` as any);
+    }
+  };
+
+  // Handle drag events
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragStates(prev => ({ ...prev, [index]: true }));
+  };
+
+  const handleDragLeave = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragStates(prev => ({ ...prev, [index]: false }));
+  };
+
+  const handleDrop = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragStates(prev => ({ ...prev, [index]: false }));
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const file = files[0];
+      
+      // Validate file type
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        setError(`questions.${index}.image` as any, {
+          type: 'manual',
+          message: 'Nieprawidłowy format pliku. Dozwolone: JPEG, PNG, WebP.'
+        });
+        return;
+      }
+      
+      // Set the file in react-hook-form
+      const input = document.getElementById(`questions.${index}.image`) as HTMLInputElement;
+      if (input) {
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        input.files = dataTransfer.files;
+        
+        // Trigger onChange event
+        const event = new Event('change', { bubbles: true });
+        input.dispatchEvent(event);
+      }
+      
+      handleImageUpload(index, file);
+    }
+  };
+
+  // Remove image
+  const removeImage = (index: number) => {
+    const input = document.getElementById(`questions.${index}.image`) as HTMLInputElement;
+    if (input) {
+      input.value = '';
+      const event = new Event('change', { bubbles: true });
+      input.dispatchEvent(event);
+    }
+    handleImageUpload(index, null);
   };
 
   // Show generation progress
@@ -382,6 +581,55 @@ export default function VideoQuizGenerator() {
                   </Button>
                 </div>
 
+                {/* Image Usage Panel */}
+                {Object.keys(imagePreviews).length > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-medium text-blue-900">
+                        Wykorzystanie obrazków
+                      </h4>
+                      <span className="text-sm text-blue-700">
+                        {formatFileSize(getTotalImageSize())} / {formatFileSize(MAX_TOTAL_SIZE)}
+                      </span>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="w-full bg-blue-200 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all duration-300 ${
+                            getTotalImageSize() > MAX_TOTAL_SIZE * 0.8 
+                              ? 'bg-red-500' 
+                              : getTotalImageSize() > MAX_TOTAL_SIZE * 0.6 
+                                ? 'bg-yellow-500' 
+                                : 'bg-blue-500'
+                          }`}
+                          style={{ 
+                            width: `${Math.min((getTotalImageSize() / MAX_TOTAL_SIZE) * 100, 100)}%` 
+                          }}
+                        />
+                      </div>
+                      
+                      <div className="flex justify-between text-xs text-blue-700">
+                        <span>
+                          {Object.keys(imagePreviews).length} obrazek(ów)
+                        </span>
+                        <span>
+                          {getTotalImageSize() > MAX_TOTAL_SIZE * 0.8 && (
+                            <span className="text-red-600 font-medium">
+                              Zbliżasz się do limitu!
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="text-xs text-blue-600">
+                      <p>• Maksymalnie {formatFileSize(MAX_IMAGE_SIZE)} na obrazek</p>
+                      <p>• Łącznie maksymalnie {formatFileSize(MAX_TOTAL_SIZE)} na wszystkie obrazki</p>
+                    </div>
+                  </div>
+                )}
+
                 {fields.map((field, index) => (
                   <Card key={field.id} className="p-4 bg-gray-50">
                     <div className="flex items-center justify-between mb-3">
@@ -434,6 +682,180 @@ export default function VideoQuizGenerator() {
                           </p>
                         )}
                       </div>
+
+                      {/* Image upload section */}
+                      <div>
+                        <Label htmlFor={`questions.${index}.image`}>
+                          Obrazek do pytania (opcjonalnie)
+                        </Label>
+                        
+                        {!imagePreviews[index] ? (
+                          // Upload area when no image
+                          <div
+                            className={`
+                              mt-2 border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all duration-200
+                              ${dragStates[index] 
+                                ? 'border-primary bg-primary/5 scale-[1.02]' 
+                                : 'border-gray-300 hover:border-primary hover:bg-gray-50'
+                              }
+                              ${errors.questions?.[index]?.image ? 'border-destructive' : ''}
+                            `}
+                            onDragOver={(e) => handleDragOver(e, index)}
+                            onDragLeave={(e) => handleDragLeave(e, index)}
+                            onDrop={(e) => handleDrop(e, index)}
+                            onClick={() => {
+                              const input = document.getElementById(`questions.${index}.image`) as HTMLInputElement;
+                              if (input) input.click();
+                            }}
+                          >
+                            <div className="flex flex-col items-center gap-3">
+                              <div className={`
+                                p-3 rounded-full transition-colors
+                                ${dragStates[index] ? 'bg-primary/10' : 'bg-gray-100'}
+                              `}>
+                                <ImageIcon className={`
+                                  h-8 w-8 transition-colors
+                                  ${dragStates[index] ? 'text-primary' : 'text-gray-400'}
+                                `} />
+                              </div>
+                              
+                              <div className="space-y-1">
+                                <p className="text-sm font-medium text-gray-900">
+                                  {dragStates[index] ? 'Upuść obrazek tutaj' : 'Dodaj obrazek do pytania'}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  Przeciągnij i upuść lub kliknij aby wybrać
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  JPEG, PNG, WebP • Max 5MB
+                                </p>
+                              </div>
+                              
+                              <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-md text-xs font-medium text-gray-600 shadow-sm">
+                                <Upload className="h-3 w-3" />
+                                Wybierz plik
+                              </div>
+                            </div>
+                            
+                            <input
+                              id={`questions.${index}.image`}
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              className="hidden"
+                              {...register(`questions.${index}.image`, {
+                                onChange: (e) => {
+                                  const file = e.target.files?.[0] || null;
+                                  if (file) {
+                                    // Validate file type
+                                    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+                                      setError(`questions.${index}.image` as any, {
+                                        type: 'manual',
+                                        message: 'Nieprawidłowy format pliku. Dozwolone: JPEG, PNG, WebP.'
+                                      });
+                                      e.target.value = ''; // Clear invalid file
+                                      return;
+                                    }
+                                  }
+                                  handleImageUpload(index, file);
+                                }
+                              })}
+                            />
+                          </div>
+                        ) : (
+                          // Preview area when image is selected
+                          <div className="mt-2 space-y-3">
+                            <div 
+                              className={`
+                                relative inline-block rounded-lg transition-all duration-200
+                                ${dragStates[index] ? 'ring-2 ring-primary ring-offset-2 scale-[1.02]' : ''}
+                              `}
+                              onDragOver={(e) => handleDragOver(e, index)}
+                              onDragLeave={(e) => handleDragLeave(e, index)}
+                              onDrop={(e) => handleDrop(e, index)}
+                            >
+                              <img
+                                src={imagePreviews[index]}
+                                alt={`Podgląd obrazka dla pytania ${index + 1}`}
+                                className="w-full max-w-sm h-auto rounded-lg border border-gray-200 shadow-sm"
+                                style={{ maxHeight: '200px', objectFit: 'cover' }}
+                              />
+                              
+                              {/* Drag overlay */}
+                              {dragStates[index] && (
+                                <div className="absolute inset-0 bg-primary/10 rounded-lg flex items-center justify-center">
+                                  <div className="bg-white/90 rounded-lg px-4 py-2 flex items-center gap-2 shadow-lg">
+                                    <Upload className="h-4 w-4 text-primary" />
+                                    <span className="text-sm font-medium text-primary">
+                                      Upuść nowy obrazek
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Remove button */}
+                              <button
+                                type="button"
+                                onClick={() => removeImage(index)}
+                                className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition-colors z-10"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                            
+                            {/* Change image button */}
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`questions.${index}.image`) as HTMLInputElement;
+                                  if (input) input.click();
+                                }}
+                                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                              >
+                                <Upload className="h-4 w-4" />
+                                Zmień obrazek
+                              </button>
+                              
+                              <span className="text-xs text-gray-500">
+                                Lub przeciągnij nowy obrazek na podgląd
+                              </span>
+                            </div>
+                            
+                            <input
+                              id={`questions.${index}.image`}
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              className="hidden"
+                              {...register(`questions.${index}.image`, {
+                                onChange: (e) => {
+                                  const file = e.target.files?.[0] || null;
+                                  if (file) {
+                                    // Validate file type
+                                    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+                                      setError(`questions.${index}.image` as any, {
+                                        type: 'manual',
+                                        message: 'Nieprawidłowy format pliku. Dozwolone: JPEG, PNG, WebP.'
+                                      });
+                                      e.target.value = ''; // Clear invalid file
+                                      return;
+                                    }
+                                  }
+                                  handleImageUpload(index, file);
+                                }
+                              })}
+                            />
+                          </div>
+                        )}
+                        
+                        {errors.questions?.[index]?.image && (
+                          <p className="text-sm text-destructive mt-2">
+                            {typeof errors.questions[index]?.image?.message === 'string' 
+                              ? errors.questions[index]?.image?.message 
+                              : 'Błąd walidacji obrazka'
+                            }
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </Card>
                 ))}
@@ -470,6 +892,10 @@ export default function VideoQuizGenerator() {
                 <p>• Quiz może zawierać od 2 do 5 pytań</p>
                 <p>• Każde pytanie powinno być jasne i konkretne</p>
                 <p>• Odpowiedzi powinny być krótkie i jednoznaczne</p>
+                <p>• Możesz dodać obrazek do pytania - będzie wyświetlony razem z pytaniem</p>
+                <p>• Obrazki będą wyświetlane nad tekstem pytania jako wizualny dodatek</p>
+                <p>• <strong>Limity obrazków:</strong> {formatFileSize(MAX_IMAGE_SIZE)} na obrazek, łącznie {formatFileSize(MAX_TOTAL_SIZE)}</p>
+                <p>• <strong>Dozwolone formaty obrazków:</strong> JPEG, PNG, WebP</p>
                 <p>• Wygenerowane wideo będzie miało format 9:16 (1080x1920px)</p>
               </div>
             </form>
