@@ -99,4 +99,23 @@ export interface VideoCompositionProps {
     outro?: AudioWithDuration;
   };
   timing: SceneTiming; // Dynamic timing based on audio durations
+}
+
+// Question generation types
+export interface QuestionGenerationRequest {
+  topic: string;
+  questionCount?: number; // Optional, defaults to 3
+  existingQuestions?: string[]; // Optional, list of existing question texts to avoid duplicates
+}
+
+export interface GeneratedQuestion {
+  question: string;
+  answer: string;
+}
+
+export interface QuestionGenerationResponse {
+  success: boolean;
+  message: string;
+  questions?: GeneratedQuestion[];
+  error?: string;
 } 

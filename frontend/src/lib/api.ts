@@ -1,4 +1,4 @@
-import type { VideoGenerationRequest, VideoGenerationResponse } from '@/types';
+import type { VideoGenerationRequest, VideoGenerationResponse, QuestionGenerationRequest, QuestionGenerationResponse } from '@/types';
 
 const API_BASE_URL = 'http://localhost:3000';
 
@@ -10,6 +10,29 @@ export class APIError extends Error {
 }
 
 export const apiClient = {
+  async generateQuestions(data: QuestionGenerationRequest): Promise<QuestionGenerationResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/generate-questions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new APIError(response.status, `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (error instanceof APIError) {
+        throw error;
+      }
+      throw new APIError(0, 'Network error or server unavailable');
+    }
+  },
+
   async generateVideo(data: VideoGenerationRequest): Promise<VideoGenerationResponse> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/generate-video`, {

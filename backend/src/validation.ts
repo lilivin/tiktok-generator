@@ -36,5 +36,25 @@ export const videoGenerationRequestSchema = z.object({
     .max(5, "Quiz może zawierać maksymalnie 5 pytań"),
 });
 
+export const questionGenerationRequestSchema = z.object({
+  topic: z
+    .string()
+    .min(1, "Temat quizu jest wymagany")
+    .min(3, "Temat musi mieć co najmniej 3 znaki")
+    .max(100, "Temat nie może być dłuższy niż 100 znaków"),
+  questionCount: z
+    .number()
+    .int()
+    .min(1, "Minimalna liczba pytań to 1")
+    .max(5, "Maksymalna liczba pytań to 5")
+    .optional()
+    .default(3),
+  existingQuestions: z
+    .array(z.string())
+    .optional()
+    .default([]),
+});
+
 export type VideoGenerationRequest = z.infer<typeof videoGenerationRequestSchema>;
-export type QuestionData = z.infer<typeof questionSchema>; 
+export type QuestionData = z.infer<typeof questionSchema>;
+export type QuestionGenerationRequest = z.infer<typeof questionGenerationRequestSchema>; 

@@ -4,9 +4,10 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs/promises';
 
-import { videoGenerationRequestSchema } from './validation';
+import { videoGenerationRequestSchema, questionGenerationRequestSchema } from './validation';
 import { VideoService } from './services/videoService';
-import type { VideoGenerationResponse } from './types';
+import { OpenAIService } from './services/openaiService';
+import type { VideoGenerationResponse, QuestionGenerationResponse } from './types';
 
 // Load environment variables
 dotenv.config({ path: '../.env' });
@@ -24,6 +25,9 @@ fastify.register(cors, {
 
 // Get VideoService instance
 const videoService = VideoService.getInstance();
+
+// Get OpenAIService instance
+const openaiService = OpenAIService.getInstance();
 
 // Health check endpoint
 fastify.get('/health', async (request, reply) => {
@@ -312,6 +316,64 @@ fastify.get<{
   }
 });
 
+// Generate questions endpoint
+fastify.post<{
+  Body: unknown;
+}>('/api/generate-questions', async (request, reply) => {
+  try {
+    // Validate request body
+    const validation = questionGenerationRequestSchema.safeParse(request.body);
+    
+    if (!validation.success) {
+      reply.status(400);
+      return {
+        success: false,
+        message: 'Dane wejściowe są nieprawidłowe',
+        error: validation.error.errors.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ')
+      } as QuestionGenerationResponse;
+    }
+
+    const { topic, questionCount, existingQuestions } = validation.data;
+
+    fastify.log.info(`Generating ${questionCount} questions for topic: ${topic}`);
+
+    // Generate questions using OpenAI
+    const questions = await openaiService.generateQuestions(topic, questionCount, existingQuestions);
+
+    fastify.log.info(`Successfully generated ${questions.length} questions for topic: ${topic}`);
+
+    return {
+      success: true,
+      message: `Pomyślnie wygenerowano ${questions.length} pytań`,
+      questions
+    } as QuestionGenerationResponse;
+
+  } catch (error) {
+    fastify.log.error('Error in generate-questions endpoint:', error);
+    
+    let errorMessage = 'Wystąpił błąd podczas generowania pytań';
+    
+    if (error instanceof Error) {
+      if (error.message.includes('API key')) {
+        errorMessage = 'Błąd konfiguracji OpenAI API. Skontaktuj się z administratorem.';
+      } else if (error.message.includes('rate limit') || error.message.includes('quota')) {
+        errorMessage = 'Przekroczono limit zapytań do OpenAI. Spróbuj ponownie za chwilę.';
+      } else if (error.message.includes('timeout')) {
+        errorMessage = 'Timeout podczas komunikacji z OpenAI. Spróbuj ponownie.';
+      } else {
+        errorMessage = error.message;
+      }
+    }
+    
+    reply.status(500);
+    return {
+      success: false,
+      message: errorMessage,
+      error: 'OpenAI API error'
+    } as QuestionGenerationResponse;
+  }
+});
+
 // Root endpoint with API info
 fastify.get('/', async (request, reply) => {
   return {
@@ -319,6 +381,7 @@ fastify.get('/', async (request, reply) => {
     version: '1.0.0',
     endpoints: {
       health: 'GET /health',
+      generateQuestions: 'POST /api/generate-questions',
       generateVideo: 'POST /api/generate-video',
       videoStatus: 'GET /api/video-status/:videoId',
       downloadVideo: 'GET /api/download-video/:videoId',

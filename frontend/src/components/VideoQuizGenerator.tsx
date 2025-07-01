@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus, Trash2, Loader2, Download, AlertTriangle, CheckCircle, Upload, X, Image as ImageIcon } from 'lucide-react';
+import { Plus, Trash2, Loader2, Download, AlertTriangle, CheckCircle, Upload, X, Image as ImageIcon, Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,13 +12,17 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 import { quizFormSchema, type QuizFormData } from '@/lib/validation';
 import { apiClient, APIError } from '@/lib/api';
-import type { VideoGenerationStatus } from '@/types';
+import type { VideoGenerationStatus, QuestionGenerationResponse } from '@/types';
 
 export default function VideoQuizGenerator() {
   const [generationStatus, setGenerationStatus] = useState<VideoGenerationStatus>({
     status: 'idle'
   });
   const [videoId, setVideoId] = useState<string | null>(null);
+  
+  // State for AI question generation
+  const [generatingQuestionIndex, setGeneratingQuestionIndex] = useState<number | null>(null);
+  const [questionGenerationError, setQuestionGenerationError] = useState<string | null>(null);
 
   // State for image previews and size tracking
   const [imagePreviews, setImagePreviews] = useState<{ [key: number]: string }>({});
@@ -51,6 +55,7 @@ export default function VideoQuizGenerator() {
     watch,
     setError,
     clearErrors,
+    setValue,
   } = useForm<QuizFormData>({
     resolver: zodResolver(quizFormSchema),
     defaultValues: {
@@ -90,6 +95,13 @@ export default function VideoQuizGenerator() {
       });
     };
   }, []);
+
+  // Clear question generation error when topic changes
+  useEffect(() => {
+    if (questionGenerationError) {
+      setQuestionGenerationError(null);
+    }
+  }, [watch('topic')]);
 
   // Convert File to base64 string
   const fileToBase64 = (file: File): Promise<string> => {
@@ -222,6 +234,78 @@ export default function VideoQuizGenerator() {
   const resetForm = () => {
     setGenerationStatus({ status: 'idle' });
     setVideoId(null);
+  };
+
+  // Generate single question using AI for specific index
+  const generateQuestionForIndex = async (questionIndex: number) => {
+    const topic = watch('topic');
+    
+    if (!topic || topic.trim().length < 3) {
+      setQuestionGenerationError('Wprowadź temat quizu (min. 3 znaki) przed generowaniem pytania');
+      return;
+    }
+
+    setGeneratingQuestionIndex(questionIndex);
+    setQuestionGenerationError(null);
+
+    try {
+      // Zbierz już istniejące pytania (z innych indeksów)
+      const allQuestions = watch('questions') || [];
+      const existingQuestions = allQuestions
+        .map((q, index) => index !== questionIndex ? q.question : null) // Pomiń aktualne pytanie
+        .filter((q): q is string => typeof q === 'string' && q.trim().length > 0); // Filtruj puste pytania
+
+      const response = await apiClient.generateQuestions({
+        topic: topic.trim(),
+        questionCount: 1, // Generujemy tylko 1 pytanie
+        existingQuestions: existingQuestions
+      });
+
+      if (response.success && response.questions && response.questions.length > 0) {
+        const generatedQuestion = response.questions[0];
+        
+        // Ustaw wartości dla konkretnego pytania
+        setValue(`questions.${questionIndex}.question`, generatedQuestion.question);
+        setValue(`questions.${questionIndex}.answer`, generatedQuestion.answer);
+        
+        // Wyczyść obrazek dla tego pytania jeśli był
+        if (imagePreviews[questionIndex]) {
+          URL.revokeObjectURL(imagePreviews[questionIndex]);
+          const newPreviews = { ...imagePreviews };
+          delete newPreviews[questionIndex];
+          setImagePreviews(newPreviews);
+        }
+        
+        // Wyczyść rozmiar obrazka dla tego pytania
+        const newSizes = { ...imageSizes };
+        delete newSizes[questionIndex];
+        setImageSizes(newSizes);
+        
+        // Wyczyść plik obrazka w formularzu
+        setValue(`questions.${questionIndex}.image`, undefined);
+
+      } else {
+        setQuestionGenerationError(response.error || 'Nie udało się wygenerować pytania');
+      }
+    } catch (error) {
+      console.error('Error generating question:', error);
+      
+      let errorMessage = 'Wystąpił błąd podczas generowania pytania';
+      
+      if (error instanceof APIError) {
+        if (error.status === 0) {
+          errorMessage = 'Brak połączenia z serwerem. Sprawdź połączenie internetowe.';
+        } else if (error.status >= 500) {
+          errorMessage = 'Błąd serwera. Spróbuj ponownie za chwilę.';
+        } else if (error.status === 400) {
+          errorMessage = 'Nieprawidłowe dane wejściowe.';
+        }
+      }
+      
+      setQuestionGenerationError(errorMessage);
+    } finally {
+      setGeneratingQuestionIndex(null);
+    }
   };
 
   const addQuestion = () => {
@@ -634,17 +718,40 @@ export default function VideoQuizGenerator() {
                   <Card key={field.id} className="p-4 bg-gray-50">
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="font-medium">Pytanie {index + 1}</h4>
-                      {questionsCount > 2 && (
+                      <div className="flex items-center gap-2">
                         <Button
                           type="button"
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          onClick={() => removeQuestion(index)}
-                          className="text-destructive hover:text-destructive"
+                          onClick={() => generateQuestionForIndex(index)}
+                          disabled={generatingQuestionIndex === index || !watch('topic') || watch('topic').length < 3}
+                          className="flex items-center gap-1.5 px-3 py-1.5"
+                          title="Wygeneruj pytanie używając AI na podstawie tematu"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          {generatingQuestionIndex === index ? (
+                            <>
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              AI
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="h-3 w-3" />
+                              AI
+                            </>
+                          )}
                         </Button>
-                      )}
+                        {questionsCount > 2 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeQuestion(index)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     
                     <div className="space-y-3">
@@ -868,6 +975,15 @@ export default function VideoQuizGenerator() {
                     </AlertDescription>
                   </Alert>
                 )}
+
+                {questionGenerationError && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      {questionGenerationError}
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
 
               {/* Submit Button */}
@@ -889,6 +1005,7 @@ export default function VideoQuizGenerator() {
 
               {/* Help Text */}
               <div className="text-sm text-muted-foreground space-y-1">
+                <p>• <strong>Przycisk AI:</strong> Kliknij przycisk AI obok każdego pytania, aby wygenerować je automatycznie na podstawie tematu</p>
                 <p>• Quiz może zawierać od 2 do 5 pytań</p>
                 <p>• Każde pytanie powinno być jasne i konkretne</p>
                 <p>• Odpowiedzi powinny być krótkie i jednoznaczne</p>
