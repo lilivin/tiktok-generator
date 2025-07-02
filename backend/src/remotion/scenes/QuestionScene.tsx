@@ -145,8 +145,73 @@ export const QuestionScene: React.FC<QuestionSceneProps> = ({
           alignItems: 'center',
           padding: '60px 40px',
           textAlign: 'center',
+          transform: 'translateY(-100px)',
         }}
       >
+        {/* Timer container - positioned absolutely above question */}
+          <div
+            style={{
+              opacity: timerOpacity,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              marginBottom: '40px',
+            }}
+          >
+            {/* Timer circle and number */}
+            <div
+              style={{
+                position: 'relative',
+                transform: `scale(${pulse})`, // Removed the 0.7 scale down factor
+              }}
+            >
+              {/* Background circle */}
+              <svg width="250" height="250" style={{ transform: 'rotate(-90deg)' }}>
+                <circle
+                  cx="125"
+                  cy="125"
+                  r="88"
+                  stroke="rgba(255,255,255,0.3)"
+                  strokeWidth="10"
+                  fill="transparent"
+                />
+                {/* Progress circle */}
+                <circle
+                  cx="125"
+                  cy="125"
+                  r="88"
+                  stroke="#FFD700"
+                  strokeWidth="10"
+                  fill="transparent"
+                  strokeLinecap="round"
+                  strokeDasharray={circumference * 1.45} // Adjusted for medium circle (88/35 * 0.58 ≈ 1.45)
+                  strokeDashoffset={strokeDashoffset * 1.45}
+                  style={{
+                    filter: 'drop-shadow(0 0 8px #FFD700)',
+                  }}
+                />
+              </svg>
+
+              {/* Timer number */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: `translate(-50%, -50%) scale(${numberScale})`,
+                  fontSize: '80px',
+                  fontWeight: '900',
+                  fontFamily: 'Poppins, Arial, sans-serif',
+                  color: '#FFFFFF',
+                  textShadow: '3px 3px 6px rgba(0,0,0,0.8)',
+                  textAlign: 'center',
+                }}
+              >
+                {currentSecond > 0 ? currentSecond : '⏰'}
+              </div>
+            </div>
+          </div>
+
         {/* Question number */}
         <div
           style={{
@@ -228,78 +293,7 @@ export const QuestionScene: React.FC<QuestionSceneProps> = ({
         </div>
       </AbsoluteFill>
 
-      {/* Timer container - positioned absolutely above question */}
-      {isTimerActive && (
-        <AbsoluteFill
-          style={{
-            top: '200px',
-            paddingTop: '80px',
-            pointerEvents: 'none',
-          }}
-        >
-          <div
-            style={{
-              opacity: timerOpacity,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-            }}
-          >
-            {/* Timer circle and number */}
-            <div
-              style={{
-                position: 'relative',
-                transform: `scale(${pulse})`, // Removed the 0.7 scale down factor
-              }}
-            >
-              {/* Background circle */}
-              <svg width="250" height="250" style={{ transform: 'rotate(-90deg)' }}>
-                <circle
-                  cx="125"
-                  cy="125"
-                  r="88"
-                  stroke="rgba(255,255,255,0.3)"
-                  strokeWidth="10"
-                  fill="transparent"
-                />
-                {/* Progress circle */}
-                <circle
-                  cx="125"
-                  cy="125"
-                  r="88"
-                  stroke="#FFD700"
-                  strokeWidth="10"
-                  fill="transparent"
-                  strokeLinecap="round"
-                  strokeDasharray={circumference * 1.45} // Adjusted for medium circle (88/35 * 0.58 ≈ 1.45)
-                  strokeDashoffset={strokeDashoffset * 1.45}
-                  style={{
-                    filter: 'drop-shadow(0 0 8px #FFD700)',
-                  }}
-                />
-              </svg>
-
-              {/* Timer number */}
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: `translate(-50%, -50%) scale(${numberScale})`,
-                  fontSize: '80px',
-                  fontWeight: '900',
-                  fontFamily: 'Poppins, Arial, sans-serif',
-                  color: '#FFFFFF',
-                  textShadow: '3px 3px 6px rgba(0,0,0,0.8)',
-                  textAlign: 'center',
-                }}
-              >
-                {currentSecond > 0 ? currentSecond : '⏰'}
-              </div>
-            </div>
-          </div>
-        </AbsoluteFill>
-      )}
+      
 
       {/* Audio track for question */}
       {audioFile && <Audio src={audioFile} volume={0.8} />}

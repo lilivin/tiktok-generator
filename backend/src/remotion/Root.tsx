@@ -19,7 +19,7 @@ export const RemotionRoot: React.FC = () => {
   const sampleProps: VideoCompositionProps = {
     topic: 'Sample Quiz',
     questions: [
-      { question: 'Sample question 1?', answer: 'Sample answer 1' },
+      { question: 'Lorem upsum dsods lasds uniniuiun sdnidasd sdoimdsa dj sdjsad jdsa asdsad  sadsad sad sdasdsad', answer: 'Sample answer 1' },
       { question: 'Sample question 2 with image?', answer: 'Sample answer 2' },
       { question: 'Sample question 3?', answer: 'Sample answer 3' },
     ],
@@ -33,7 +33,7 @@ export const RemotionRoot: React.FC = () => {
       'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1920&h=1080&fit=crop',
     ],
     questionImages: [
-      '', // No image for first question
+      'https://images.unsplash.com/photo-1750711642160-efc6e052751a?q=80&w=3028&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', // No image for first question
       'https://images.unsplash.com/photo-1750711642160-efc6e052751a?q=80&w=3028&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', // Sample image for second question
       '', // No image for third question
     ],

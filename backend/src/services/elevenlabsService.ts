@@ -10,13 +10,60 @@ const execAsync = promisify(exec);
 export class ElevenLabsService {
   private apiKey: string;
   private baseUrl = 'https://api.elevenlabs.io/v1';
-  private voiceId = 'pNInz6obpgDQGcFmaJgB'; // Adam - English voice (replace with Polish voice ID)
+  // Polish voice IDs - you may need to verify these or use your own
+  private voiceId = 'kPzsL2i3teMYv0FxEYQ6'; // Polish female voice or replace with preferred Polish voice
   
   constructor() {
     this.apiKey = process.env.ELEVENLABS_API_KEY || '';
     if (!this.apiKey) {
       throw new Error('ELEVENLABS_API_KEY environment variable is required');
     }
+  }
+
+  /**
+   * Preprocess text to make it more natural for TTS
+   */
+  private preprocessText(text: string): string {
+    let processedText = text.trim();
+    
+    // Add natural pauses for slower, more natural delivery
+    processedText = processedText.replace(/\./g, '... ');
+    processedText = processedText.replace(/,/g, ', ');
+    processedText = processedText.replace(/:/g, ': ');
+    processedText = processedText.replace(/-/g, ' - ');
+    
+    // Add extra pauses around key phrases
+    processedText = processedText.replace(/odpowiedź/gi, 'odpowiedź... ');
+    processedText = processedText.replace(/pytanie/gi, 'pytanie... ');
+    
+    // Ensure text ends with proper punctuation for natural intonation
+    if (!processedText.match(/[.!?…]$/)) {
+      processedText += '.';
+    }
+    
+    // For very short texts, add breathing room
+    if (processedText.split(/\s+/).length <= 3) {
+      processedText = processedText.replace(/\s+/g, '  '); // Double spaces for slower delivery
+    }
+    
+    return processedText;
+  }
+
+  /**
+   * Get improved voice settings based on text length and content
+   */
+  private getVoiceSettings(text: string) {
+    const wordCount = text.split(/\s+/).length;
+    const isShort = wordCount <= 3;
+    
+    return {
+      stability: 0.8, // Higher stability for more consistent, calmer delivery
+      similarity_boost: 0.85, // Slightly lower for more natural variation
+      style: 0.1, // Much lower style for less dramatic, slower delivery
+      use_speaker_boost: true,
+      // Additional settings for better quality and slower pace
+      optimize_streaming_latency: 0 // Better quality over speed
+    };
   }
 
   /**
@@ -75,7 +122,21 @@ export class ElevenLabsService {
    * Generate audio for an answer
    */
   async generateAnswerAudio(answer: string, index: number, outputDir: string): Promise<{ path: string; duration: number }> {
-    const text = `Odpowiedź to: ${answer}`;
+    // Improve context for answers, especially short ones
+    let text: string;
+    const wordCount = answer.trim().split(/\s+/).length;
+    
+    if (wordCount === 1) {
+      // For single words, add more context
+      text = `Prawidłowa odpowiedź to: ${answer}. Zgadłeś?`;
+    } else if (wordCount <= 3) {
+      // For short phrases, add some context
+      text = `Odpowiedź brzmi: ${answer}.`;
+    } else {
+      // For longer answers, use standard format
+      text = `Odpowiedź to: ${answer}`;
+    }
+    
     const audioPath = await this.generateAndSaveAudio(text, outputDir, `answer-${index + 1}`);
     const duration = await this.getAudioDuration(audioPath);
     return { path: audioPath, duration };
@@ -88,17 +149,17 @@ export class ElevenLabsService {
     try {
       console.log(`Generating audio for: ${filename}`);
       
+      const processedText = this.preprocessText(text);
+      const voiceSettings = this.getVoiceSettings(processedText);
+      
+      console.log(`Processed text: "${processedText}"`);
+      
       const response: AxiosResponse<ArrayBuffer> = await axios.post(
         `${this.baseUrl}/text-to-speech/${this.voiceId}`,
         {
-          text,
-          model_id: "eleven_multilingual_v2",
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.8,
-            style: 0.3, // Slightly expressive
-            use_speaker_boost: true
-          }
+          text: processedText,
+          model_id: "eleven_multilingual_v2", // Consider upgrading to "eleven_turbo_v2" if available
+          voice_settings: voiceSettings
         },
         {
           headers: {
