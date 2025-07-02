@@ -4,7 +4,7 @@ export const questionSchema = z.object({
   question: z
     .string()
     .min(1, "Treść pytania jest wymagana")
-    .min(5, "Pytanie musi mieć co najmniej 5 znaków")
+    .min(4, "Pytanie musi mieć co najmniej 5 znaków")
     .max(200, "Pytanie nie może być dłuższe niż 200 znaków"),
   answer: z
     .string()

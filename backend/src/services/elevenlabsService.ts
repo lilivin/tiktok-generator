@@ -23,9 +23,24 @@ export class ElevenLabsService {
   /**
    * Preprocess text to make it more natural for TTS
    */
-  private preprocessText(text: string): string {
+  private preprocessText(text: string, contentType?: string): string {
     let processedText = text.trim();
     
+    // Special preprocessing for intro - more energetic and friendly
+    if (contentType === 'intro') {
+      // Add enthusiasm markers and better pacing for intro
+      processedText = processedText.replace(/!/g, '! '); // Add space after exclamation for better pacing
+      processedText = processedText.replace(/-/g, ' - '); // Add spaces around dash
+      
+      // Ensure energetic delivery with proper punctuation
+      if (!processedText.match(/[!]$/)) {
+        processedText += '!';
+      }
+      
+      return processedText;
+    }
+    
+    // Default preprocessing for other content
     // Add natural pauses for slower, more natural delivery
     processedText = processedText.replace(/\./g, '... ');
     processedText = processedText.replace(/,/g, ', ');
@@ -52,10 +67,22 @@ export class ElevenLabsService {
   /**
    * Get improved voice settings based on text length and content
    */
-  private getVoiceSettings(text: string) {
+  private getVoiceSettings(text: string, contentType?: string) {
     const wordCount = text.split(/\s+/).length;
     const isShort = wordCount <= 3;
     
+    // Special settings for intro - more energetic but friendly
+    if (contentType === 'intro') {
+      return {
+        stability: 0.65, // Lower stability for more expression and energy
+        similarity_boost: 0.85, 
+        style: 0.55, // Higher style for more energy and enthusiasm
+        use_speaker_boost: true,
+        optimize_streaming_latency: 0
+      };
+    }
+    
+    // Default settings for other content
     return {
       stability: 0.8, // Higher stability for more consistent, calmer delivery
       similarity_boost: 0.85, // Slightly lower for more natural variation
@@ -93,7 +120,7 @@ export class ElevenLabsService {
    * Generate audio for intro text
    */
   async generateIntroAudio(topic: string, outputDir: string): Promise<{ path: string; duration: number }> {
-    const text = `Nie zgadniesz, odpadasz - ${topic}`;
+    const text = `Nie zgadniesz, odpadasz! - ${topic}`;
     const audioPath = await this.generateAndSaveAudio(text, outputDir, 'intro');
     const duration = await this.getAudioDuration(audioPath);
     return { path: audioPath, duration };
@@ -127,14 +154,39 @@ export class ElevenLabsService {
     const wordCount = answer.trim().split(/\s+/).length;
     
     if (wordCount === 1) {
-      // For single words, add more context
-      text = `Prawidłowa odpowiedź to: ${answer}. Zgadłeś?`;
+      // For single words, add more context with random variations
+      const singleWordVariations = [
+        `Prawidłowa odpowiedź to: ${answer}. Zgadłeś?`,
+        `To jest: ${answer}. Miałeś rację?`,
+        `Poprawnie, to: ${answer}. Wiedziałeś?`,
+        `Tak, to ${answer}. Dobra odpowiedź!`,
+        `Oczywiście, to ${answer}. Łatwe, prawda?`,
+        `Dokładnie: ${answer}. Czy to było trudne?`
+      ];
+      text = singleWordVariations[Math.floor(Math.random() * singleWordVariations.length)];
     } else if (wordCount <= 3) {
-      // For short phrases, add some context
-      text = `Odpowiedź brzmi: ${answer}.`;
+      // For short phrases, add some context with variations
+      const shortPhraseVariations = [
+        `Odpowiedź brzmi: ${answer}.`,
+        `To jest: ${answer}.`,
+        `Prawidłowo: ${answer}.`,
+        `Tak, to ${answer}.`,
+        `Oczywiście: ${answer}.`,
+        `Dokładnie: ${answer}.`,
+        `Właśnie tak: ${answer}.`
+      ];
+      text = shortPhraseVariations[Math.floor(Math.random() * shortPhraseVariations.length)];
     } else {
-      // For longer answers, use standard format
-      text = `Odpowiedź to: ${answer}`;
+      // For longer answers, use standard format with variations
+      const longAnswerVariations = [
+        `Odpowiedź to: ${answer}`,
+        `Prawidłowa odpowiedź: ${answer}`,
+        `To brzmi tak: ${answer}`,
+        `Właściwa odpowiedź: ${answer}`,
+        `Poprawnie: ${answer}`,
+        `Tak to wygląda: ${answer}`
+      ];
+      text = longAnswerVariations[Math.floor(Math.random() * longAnswerVariations.length)];
     }
     
     const audioPath = await this.generateAndSaveAudio(text, outputDir, `answer-${index + 1}`);
@@ -149,8 +201,8 @@ export class ElevenLabsService {
     try {
       console.log(`Generating audio for: ${filename}`);
       
-      const processedText = this.preprocessText(text);
-      const voiceSettings = this.getVoiceSettings(processedText);
+      const processedText = this.preprocessText(text, filename.includes('intro') ? 'intro' : undefined);
+      const voiceSettings = this.getVoiceSettings(processedText, filename.includes('intro') ? 'intro' : undefined);
       
       console.log(`Processed text: "${processedText}"`);
       
